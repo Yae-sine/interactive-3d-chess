@@ -1,35 +1,80 @@
-# v0-interactive-3-d-chess
+# Chess Master 3D
 
-This is a [Next.js](https://nextjs.org) project bootstrapped with [v0](https://v0.app).
+An interactive 3D chess game with AI opponent powered by Stockfish, featuring real-time coaching, blunder detection, and a beautiful walnut-themed board.
 
-## Built with v0
+## Features
 
-This repository is linked to a [v0](https://v0.app) project. You can continue developing by visiting the link below -- start new chats to make changes, and v0 will push commits directly to this repo. Every merge to `main` will automatically deploy.
+- **3D Interactive Board** - Drag to rotate the board in 3D space with smooth CSS transforms
+- **Stockfish AI** - Play against Stockfish chess engine with 4 difficulty levels:
+  - Beginner (depth 2)
+  - Intermediate (depth 8)
+  - Advanced (depth 14)
+  - Master (depth 20)
+- **AI Coach "Magnus"** - Get real-time feedback on your moves with blunder detection and suggested improvements
+- **Hint System** - Request move hints when you're stuck
+- **Takeback** - Undo your last move to try a different approach
+- **Parallel Explorer** - Explore alternate move lines without affecting the main game
+- **Move History** - Track all moves in standard algebraic notation
+- **Captured Pieces** - Visual display of captured pieces with material count
 
-[Continue working on v0 →](https://v0.app/chat/projects/prj_DCFOlXwW8xy7jLAz569EbBMWwEFw)
+## Tech Stack
+
+- **Next.js 16** - React framework with App Router
+- **React 19** - UI library
+- **TypeScript** - Type-safe JavaScript
+- **Tailwind CSS 4** - Utility-first styling
+- **chess.js** - Chess move validation and game logic
+- **Stockfish.js** - Chess engine running as a Web Worker
+- **Vercel Analytics** - Usage tracking
 
 ## Getting Started
 
-First, run the development server:
-
 ```bash
+# Install dependencies
+npm install
+
+# Run development server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
+
+# Build for production
+npm run build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) to play.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Project Structure
 
-## Learn More
+```
+app/
+  page.tsx          # Main chess page
+  layout.tsx        # Root layout with fonts
+  globals.css       # Theme and styling
+  api/coach/        # AI coach API endpoint (optional)
 
-To learn more, take a look at the following resources:
+components/chess/
+  Board3D.tsx       # 3D chessboard with SVG pieces
+  GameHUD.tsx       # Game controls and status
+  CoachPanel.tsx    # AI coaching messages
+  CapturedPieces.tsx # Captured pieces display
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-- [v0 Documentation](https://v0.app/docs) - learn about v0 and how to use it.
+hooks/
+  use-chess-game.ts # Main game state and logic
+  use-stockfish.ts  # Stockfish engine integration
 
-<a href="https://v0.app/chat/api/kiro/clone/Yae-sine/v0-interactive-3-d-chess" alt="Open in Kiro"><img src="https://pdgvvgmkdvyeydso.public.blob.vercel-storage.com/open%20in%20kiro.svg?sanitize=true" /></a>
+lib/
+  chess-engine.ts   # Types, constants, evaluation
+
+public/
+  stockfish.js      # Stockfish engine (Web Worker)
+```
+
+## How It Works
+
+1. **Game State** - Managed by `useChessGame` hook using React state
+2. **Move Validation** - chess.js validates all moves and tracks game state
+3. **AI Moves** - Stockfish runs in a Web Worker, receiving FEN positions and returning best moves via UCI protocol
+4. **Coaching** - Local blunder detection compares move quality; messages displayed in real-time with streaming animation
+
+## License
+
+MIT
