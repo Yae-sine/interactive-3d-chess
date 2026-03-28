@@ -21,20 +21,6 @@ interface BoardProps {
 const FILES = ['a','b','c','d','e','f','g','h'] as const
 const RANKS = ['8','7','6','5','4','3','2','1'] as const
 
-// ─── Deterministic starfield (pre-computed string values for hydration) ─────
-const STARS = Array.from({ length: 100 }, (_, i) => {
-  function r(seed: number) { return ((Math.sin(i * seed) * 233280) % 1 + 1) % 1 }
-  const top = r(9301) * 100
-  const left = r(7691) * 100
-  const s = r(1234) * 2 + 0.5
-  const o = r(4321) * 0.5 + 0.1
-  return {
-    top: `${top.toFixed(2)}%`,
-    left: `${left.toFixed(2)}%`,
-    size: `${s.toFixed(1)}px`,
-    opacity: o.toFixed(2),
-  }
-})
 
 // ─── Staunton SVG pieces ──────────────────────────────────────────────────────
 function PieceSVG({ type, isWhite }: { type: string; isWhite: boolean }) {
@@ -306,13 +292,6 @@ export default function Board3D({
     <div className="w-full h-full relative flex items-center justify-center overflow-hidden"
       style={{ background: 'radial-gradient(ellipse at 50% 30%, #1a1430 0%, #0d0b08 55%, #050305 100%)' }}>
 
-      {/* Starfield */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
-        {STARS.map((s, i) => (
-          <div key={i} className="absolute rounded-full bg-white"
-            style={{ width: s.size, height: s.size, top: s.top, left: s.left, opacity: s.opacity }} />
-        ))}
-      </div>
 
       {/* Ambient radial glow under board */}
       <div className="absolute pointer-events-none" aria-hidden="true"
