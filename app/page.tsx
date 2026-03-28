@@ -4,7 +4,7 @@ import { useChessGame } from '@/hooks/use-chess-game'
 import GameHUD from '@/components/chess/GameHUD'
 import CoachPanel from '@/components/chess/CoachPanel'
 import CapturedPieces from '@/components/chess/CapturedPieces'
-import ChessScene from '@/components/chess/ChessScene'
+import ChessScene from '@/components/chess/Board3D'
 
 export default function ChessPage() {
   const {
