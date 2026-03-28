@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useCallback } from 'react'
-import { DIFFICULTY_DEPTH, DIFFICULTY_ELO, type Difficulty } from '@/lib/chess-engine'
+import { DIFFICULTY_DEPTH, type Difficulty } from '@/lib/chess-engine'
 
 interface StockfishMove {
   from: string
@@ -29,11 +29,8 @@ export function useStockfish({ onBestMove, onReady }: UseStockfishOptions) {
   onReadyRef.current = onReady
 
   useEffect(() => {
-    // Stockfish worker via CDN — zero npm dependency issues
-    const worker = new Worker(
-      'https://cdn.jsdelivr.net/npm/stockfish@16.0.0/src/stockfish-nnue-16.js',
-      { type: 'classic' }
-    )
+    // Load Stockfish from local public folder (browsers block cross-origin workers)
+    const worker = new Worker('/stockfish.js')
 
     worker.onmessage = (e: MessageEvent<string>) => {
       const line = e.data
@@ -46,9 +43,10 @@ export function useStockfish({ onBestMove, onReady }: UseStockfishOptions) {
       if (line === 'readyok') {
         readyRef.current = true
         onReadyRef.current()
-        // Run any pending position
+        // Run any pending commands
         if (pendingRef.current) {
-          worker.postMessage(pendingRef.current)
+          const cmds = pendingRef.current.split('\n')
+          cmds.forEach(cmd => worker.postMessage(cmd))
           pendingRef.current = null
         }
         return
@@ -79,21 +77,13 @@ export function useStockfish({ onBestMove, onReady }: UseStockfishOptions) {
 
   const requestMove = useCallback((fen: string, difficulty: Difficulty) => {
     const depth = DIFFICULTY_DEPTH[difficulty]
-    const elo = DIFFICULTY_ELO[difficulty]
-    const cmd = [
-      `setoption name UCI_LimitStrength value ${difficulty !== 'master' ? 'true' : 'false'}`,
-      `setoption name UCI_Elo value ${elo}`,
-      `position fen ${fen}`,
-      `go depth ${depth}`,
-    ].join('\n')
 
     if (!readyRef.current || !workerRef.current) {
-      pendingRef.current = cmd
+      // Store pending command - stockfish.js 10 uses depth-only for difficulty
+      pendingRef.current = `position fen ${fen}\ngo depth ${depth}`
       return
     }
 
-    workerRef.current.postMessage(`setoption name UCI_LimitStrength value ${difficulty !== 'master' ? 'true' : 'false'}`)
-    workerRef.current.postMessage(`setoption name UCI_Elo value ${elo}`)
     workerRef.current.postMessage(`position fen ${fen}`)
     workerRef.current.postMessage(`go depth ${depth}`)
   }, [])

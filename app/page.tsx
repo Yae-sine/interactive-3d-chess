@@ -20,71 +20,72 @@ export default function ChessPage() {
   } = useChessGame()
 
   return (
-    <main className="flex h-screen overflow-hidden font-sans" style={{ background: 'var(--background)' }}>
-
-      {/* ── Left sidebar ──────────────────────────────────────────── */}
-      <aside
-        className="w-60 shrink-0 flex flex-col gap-3 p-4 overflow-y-auto thin-scroll"
-        style={{ borderRight: '1px solid rgba(201,146,42,0.12)', background: 'var(--card)' }}
-      >
-        {/* Logo */}
-        <div className="flex items-center gap-2.5 pb-3" style={{ borderBottom: '1px solid rgba(201,146,42,0.12)' }}>
-          <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
-            style={{ background: 'linear-gradient(135deg, #3d1e08, #6b3410)', border: '1px solid rgba(201,146,42,0.3)', boxShadow: '0 2px 8px rgba(0,0,0,0.4)' }}>
-            <span style={{ fontSize: '18px', lineHeight: 1, color: '#c9922a' }}>♛</span>
-          </div>
-          <div>
-            <h1 className="text-sm font-bold tracking-tight" style={{ color: 'var(--foreground)' }}>Chess Master 3D</h1>
-            <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>Powered by Stockfish</p>
-          </div>
-        </div>
-
-        <GameHUD
-          difficulty={state.difficulty}
-          turn={state.turn}
-          isThinking={state.isThinking}
-          isGameOver={state.isGameOver}
-          isCheck={state.isCheck}
-          isCheckmate={state.isCheckmate}
-          isDraw={state.isDraw}
-          isExploringParallel={state.isExploringParallel}
-          parallelMoveCount={state.parallelMoves.length}
-          moveCount={state.moveCount}
-          canTakeback={state.history.length >= 2}
-          onTakeback={takeback}
-          onHint={requestHint}
-          onNewGame={newGame}
-          onDifficultyChange={setDifficulty}
-          onStartParallel={() => startParallelExploration(state.fen)}
-          onExitParallel={exitParallelExploration}
-        />
-
-        <CapturedPieces
-          capturedWhite={state.capturedWhite}
-          capturedBlack={state.capturedBlack}
-        />
-
-        {/* Legend */}
-        <div className="rounded-lg p-3 text-xs space-y-1.5"
-          style={{ background: 'var(--secondary)', border: '1px solid var(--border)' }}>
-          <p className="font-semibold mb-2" style={{ color: 'var(--muted-foreground)' }}>LEGEND</p>
-          {[
-            { color: '#7fc97f', label: 'Selected piece' },
-            { color: '#f0f069', label: 'Last move' },
-            { color: '#e6a817', label: 'Hint square' },
-            { color: '#e84040', label: 'King in check' },
-            { color: '#4a90c4', label: 'Parallel line' },
-          ].map(({ color, label }) => (
-            <div key={label} className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-sm shrink-0" style={{ background: color }} />
-              <span style={{ color: 'var(--muted-foreground)' }}>{label}</span>
+    <main className="flex h-screen overflow-hidden bg-[#0a0908]">
+      {/* Left Panel - Controls */}
+      <aside className="w-64 flex flex-col border-r border-[#1a1612] bg-[#0d0b09]">
+        {/* Header */}
+        <header className="px-4 py-4 border-b border-[#1a1612]">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-700 to-amber-900 flex items-center justify-center shadow-lg">
+              <span className="text-xl text-amber-200">♛</span>
             </div>
-          ))}
+            <div>
+              <h1 className="text-base font-semibold text-[#e8e2d4]">Chess Master</h1>
+              <p className="text-xs text-[#6a6258]">Stockfish AI</p>
+            </div>
+          </div>
+        </header>
+
+        {/* Game Controls */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <GameHUD
+            difficulty={state.difficulty}
+            turn={state.turn}
+            isThinking={state.isThinking}
+            isGameOver={state.isGameOver}
+            isCheck={state.isCheck}
+            isCheckmate={state.isCheckmate}
+            isDraw={state.isDraw}
+            isExploringParallel={state.isExploringParallel}
+            parallelMoveCount={state.parallelMoves.length}
+            moveCount={state.moveCount}
+            canTakeback={state.history.length >= 2}
+            onTakeback={takeback}
+            onHint={requestHint}
+            onNewGame={newGame}
+            onDifficultyChange={setDifficulty}
+            onStartParallel={() => startParallelExploration(state.fen)}
+            onExitParallel={exitParallelExploration}
+          />
+
+          <CapturedPieces
+            capturedWhite={state.capturedWhite}
+            capturedBlack={state.capturedBlack}
+          />
+
+          {/* Board Legend */}
+          <div className="rounded-lg p-3 bg-[#111010] border border-[#1a1612]">
+            <p className="text-[10px] uppercase tracking-wider text-[#5a554d] mb-2 font-medium">Legend</p>
+            <div className="space-y-1.5 text-xs">
+              {[
+                { color: '#7fc97f', label: 'Selected' },
+                { color: '#f0f069', label: 'Last move' },
+                { color: '#e6a817', label: 'Hint' },
+                { color: '#e84040', label: 'Check' },
+                { color: '#4a90c4', label: 'Exploring' },
+              ].map(({ color, label }) => (
+                <div key={label} className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 rounded-sm" style={{ background: color }} />
+                  <span className="text-[#6a6258]">{label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </aside>
 
-      {/* ── Main board ────────────────────────────────────────────── */}
-      <div className="flex-1 relative min-w-0">
+      {/* Center - Chess Board */}
+      <div className="flex-1 relative">
         <Board3D
           fen={state.fen}
           parallelFen={state.parallelFen}
@@ -99,11 +100,8 @@ export default function ChessPage() {
         />
       </div>
 
-      {/* ── Right sidebar — Coach ─────────────────────────────────── */}
-      <aside
-        className="w-72 shrink-0 flex flex-col"
-        style={{ borderLeft: '1px solid rgba(201,146,42,0.12)', background: 'var(--card)' }}
-      >
+      {/* Right Panel - Coach */}
+      <aside className="w-80 border-l border-[#1a1612] bg-[#0d0b09]">
         <CoachPanel
           messages={state.coachMessages}
           isThinking={state.isThinking}

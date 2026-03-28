@@ -8,7 +8,6 @@ interface CoachPanelProps {
   messages: CoachMessage[]
   isThinking: boolean
   isExploringParallel: boolean
-  currentFen: string
   moveHistory: string[]
 }
 
@@ -127,7 +126,6 @@ export default function CoachPanel({
   messages,
   isThinking,
   isExploringParallel,
-  currentFen,
   moveHistory,
 }: CoachPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -141,17 +139,17 @@ export default function CoachPanel({
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-border/40">
-        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/20 border border-primary/30">
-          <Sparkles className="w-4 h-4 text-primary" />
+      <div className="flex items-center gap-3 px-4 py-4 border-b border-[#1a1612]">
+        <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-gradient-to-br from-purple-600 to-purple-800 shadow-lg">
+          <Sparkles className="w-4 h-4 text-purple-200" />
         </div>
         <div>
-          <h2 className="text-sm font-semibold text-foreground">Magnus</h2>
-          <p className="text-xs text-muted-foreground">AI Chess Coach</p>
+          <h2 className="text-sm font-semibold text-[#e8e2d4]">Magnus</h2>
+          <p className="text-xs text-[#6a6258]">AI Coach</p>
         </div>
         {isExploringParallel && (
           <div className="ml-auto px-2 py-0.5 rounded-full bg-blue-500/20 border border-blue-500/30">
-            <span className="text-xs text-blue-400 font-medium">Explorer Mode</span>
+            <span className="text-xs text-blue-400 font-medium">Explorer</span>
           </div>
         )}
       </div>
@@ -165,8 +163,8 @@ export default function CoachPanel({
 
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-32 text-center gap-2">
-            <BookOpen className="w-8 h-8 text-muted-foreground/40" />
-            <p className="text-xs text-muted-foreground">
+            <BookOpen className="w-8 h-8 text-[#3a3630]" />
+            <p className="text-xs text-[#5a554d]">
               Make your first move and I&apos;ll start coaching you!
             </p>
           </div>
@@ -179,19 +177,19 @@ export default function CoachPanel({
 
       {/* Move history */}
       {moveHistory.length > 0 && (
-        <div className="border-t border-border/40 p-3">
-          <p className="text-xs text-muted-foreground mb-2 font-medium">Move History</p>
+        <div className="border-t border-[#1a1612] p-3 bg-[#0a0908]">
+          <p className="text-[10px] uppercase tracking-wider text-[#5a554d] mb-2 font-medium">Move History</p>
           <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto coach-scroll">
             {moveHistory.map((move, i) => (
               <span
                 key={i}
-                className={`text-xs font-mono px-1.5 py-0.5 rounded border ${
+                className={`text-xs font-mono px-1.5 py-0.5 rounded ${
                   i % 2 === 0
-                    ? 'bg-secondary/60 border-border/30 text-foreground'
-                    : 'bg-muted/40 border-border/20 text-muted-foreground'
+                    ? 'bg-[#1a1612] text-[#c9c2b4]'
+                    : 'bg-[#111010] text-[#8a8478]'
                 }`}
               >
-                {i % 2 === 0 && <span className="text-muted-foreground mr-1">{Math.floor(i / 2) + 1}.</span>}
+                {i % 2 === 0 && <span className="text-[#5a554d] mr-1">{Math.floor(i / 2) + 1}.</span>}
                 {move}
               </span>
             ))}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useRef } from 'react'
+import React, { useState, useCallback, useRef, useMemo } from 'react'
 import { Chess } from 'chess.js'
 import type { Square } from 'chess.js'
 
@@ -21,10 +21,19 @@ interface BoardProps {
 const FILES = ['a','b','c','d','e','f','g','h'] as const
 const RANKS = ['8','7','6','5','4','3','2','1'] as const
 
-// ─── Deterministic starfield ───────────────────────────────────────────────
+// ─── Deterministic starfield (pre-computed string values for hydration) ─────
 const STARS = Array.from({ length: 100 }, (_, i) => {
   function r(seed: number) { return ((Math.sin(i * seed) * 233280) % 1 + 1) % 1 }
-  return { top: r(9301) * 100, left: r(7691) * 100, s: r(1234) * 2 + 0.5, o: r(4321) * 0.5 + 0.1 }
+  const top = r(9301) * 100
+  const left = r(7691) * 100
+  const s = r(1234) * 2 + 0.5
+  const o = r(4321) * 0.5 + 0.1
+  return {
+    top: `${top.toFixed(2)}%`,
+    left: `${left.toFixed(2)}%`,
+    size: `${s.toFixed(1)}px`,
+    opacity: o.toFixed(2),
+  }
 })
 
 // ─── Staunton SVG pieces ──────────────────────────────────────────────────────
@@ -33,7 +42,7 @@ function PieceSVG({ type, isWhite }: { type: string; isWhite: boolean }) {
   const stroke = isWhite ? '#8b6914' : '#c9a96e'
   const sw = '1.3'
 
-  const shapes: Record<string, JSX.Element> = {
+  const shapes: Record<string, React.ReactNode> = {
     k: (
       <svg viewBox="0 0 45 45" width="100%" height="100%">
         <g fill={fill} stroke={stroke} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round">
@@ -232,22 +241,28 @@ export default function Board3D({
   isExploringParallel, pendingPromotion, onSquareClick, onPromotion,
 }: BoardProps) {
   const displayFen = isExploringParallel && parallelFen ? parallelFen : fen
-  const chess = new Chess(displayFen)
-  const board  = chess.board()
 
-  // Check square for king
-  let checkSquare: Square | null = null
-  if (chess.isCheck()) {
+  // Memoize the chess instance to avoid recreating on every render
+  const { board, isCheck, turn, checkSquare } = useMemo(() => {
+    const chess = new Chess(displayFen)
+    const board = chess.board()
+    const isCheck = chess.isCheck()
     const turn = chess.turn()
-    outer: for (const row of board) {
-      for (const cell of row) {
-        if (cell?.type === 'k' && cell.color === turn) {
-          checkSquare = cell.square as Square
-          break outer
+
+    let checkSquare: Square | null = null
+    if (isCheck) {
+      outer: for (const row of board) {
+        for (const cell of row) {
+          if (cell?.type === 'k' && cell.color === turn) {
+            checkSquare = cell.square as Square
+            break outer
+          }
         }
       }
     }
-  }
+
+    return { board, isCheck, turn, checkSquare }
+  }, [displayFen])
 
   // 3D tilt state
   const [tilt, setTilt] = useState({ x: 24, y: 0 })
@@ -294,8 +309,8 @@ export default function Board3D({
       {/* Starfield */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
         {STARS.map((s, i) => (
-          <div key={i} className="absolute rounded-full"
-            style={{ width: s.s, height: s.s, top: `${s.top}%`, left: `${s.left}%`, opacity: s.o, background: '#fff' }} />
+          <div key={i} className="absolute rounded-full bg-white"
+            style={{ width: s.size, height: s.size, top: s.top, left: s.left, opacity: s.opacity }} />
         ))}
       </div>
 
@@ -395,7 +410,7 @@ export default function Board3D({
 
       {/* Promotion picker */}
       {pendingPromotion && (
-        <PromotionPicker isWhite={chess.turn() === 'w'} onPick={onPromotion} />
+        <PromotionPicker isWhite={turn === 'w'} onPick={onPromotion} />
       )}
 
       {/* Parallel explorer badge */}
