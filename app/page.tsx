@@ -1,24 +1,10 @@
 'use client'
 
-import dynamic from 'next/dynamic'
 import { useChessGame } from '@/hooks/use-chess-game'
 import GameHUD from '@/components/chess/GameHUD'
 import CoachPanel from '@/components/chess/CoachPanel'
 import CapturedPieces from '@/components/chess/CapturedPieces'
-import { Loader2 } from 'lucide-react'
-
-// Dynamically import the 3D scene to avoid SSR issues
-const ChessScene = dynamic(() => import('@/components/chess/ChessScene'), {
-  ssr: false,
-  loading: () => (
-    <div className="w-full h-full flex items-center justify-center bg-background">
-      <div className="flex flex-col items-center gap-3">
-        <Loader2 className="w-8 h-8 text-primary animate-spin" />
-        <p className="text-sm text-muted-foreground">Loading 3D Board...</p>
-      </div>
-    </div>
-  ),
-})
+import ChessScene from '@/components/chess/ChessScene'
 
 export default function ChessPage() {
   const {
