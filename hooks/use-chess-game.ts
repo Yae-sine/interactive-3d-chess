@@ -3,18 +3,25 @@
 import { useState, useCallback, useRef } from 'react'
 import { Chess, Square, Move, Piece } from 'chess.js'
 import {
-  GameState, INITIAL_STATE, DIFFICULTY_DEPTH,
-  getBestMove, getMoveDelta, evaluateBoard,
-  CoachMessage, Difficulty
+  GameState, INITIAL_STATE, CoachMessage, Difficulty,
+  getBlunderSeverity,
 } from '@/lib/chess-engine'
+import { useStockfish } from './use-stockfish'
 
-function generateId() {
-  return Math.random().toString(36).slice(2)
-}
+let _idCounter = 0
+function genId() { return `msg_${++_idCounter}_${Date.now()}` }
 
-function buildState(chess: Chess, partial: Partial<GameState>): Partial<GameState> {
-  const { capturedWhite, capturedBlack } = getCapturedFromChess(chess)
+function derivedState(chess: Chess): Partial<GameState> {
   const history = chess.history({ verbose: true }) as Move[]
+  const capturedWhite: Piece[] = []
+  const capturedBlack: Piece[] = []
+  for (const m of history) {
+    if (m.captured) {
+      const p: Piece = { type: m.captured, color: m.color === 'w' ? 'b' : 'w' } as Piece
+      if (m.color === 'w') capturedWhite.push(p)
+      else capturedBlack.push(p)
+    }
+  }
   return {
     fen: chess.fen(),
     history,
@@ -25,320 +32,305 @@ function buildState(chess: Chess, partial: Partial<GameState>): Partial<GameStat
     isCheckmate: chess.isCheckmate(),
     isDraw: chess.isDraw(),
     isGameOver: chess.isGameOver(),
-    ...partial,
   }
-}
-
-function getCapturedFromChess(chess: Chess) {
-  const capturedWhite: Piece[] = []
-  const capturedBlack: Piece[] = []
-  const history = chess.history({ verbose: true }) as Move[]
-  for (const move of history) {
-    if (move.captured) {
-      const piece: Piece = { type: move.captured, color: move.color === 'w' ? 'b' : 'w' } as Piece
-      if (move.color === 'w') capturedWhite.push(piece)
-      else capturedBlack.push(piece)
-    }
-  }
-  return { capturedWhite, capturedBlack }
 }
 
 export function useChessGame() {
   const [state, setState] = useState<GameState>(() => ({
     ...INITIAL_STATE,
     coachMessages: [{
-      id: generateId(),
+      id: genId(),
       type: 'info',
       title: 'Welcome to Chess Master 3D',
-      content: "I'm Magnus, your AI chess coach. Play your first move and I'll guide you! Remember: control the center, develop your pieces, and castle early.",
+      content: 'Your AI coach is ready. Play your first move — I\'ll watch for blunders, offer hints, and explain every key moment. Control the center, develop early, castle soon!',
       timestamp: Date.now(),
     }],
   }))
 
-  const thinkingTimeout = useRef<NodeJS.Timeout | null>(null)
   const stateRef = useRef(state)
   stateRef.current = state
 
-  const addMessage = useCallback((msg: Omit<CoachMessage, 'id' | 'timestamp'>) => {
-    const newMsg: CoachMessage = { ...msg, id: generateId(), timestamp: Date.now() }
+  // Track whether we're currently awaiting a hint (vs a game move)
+  const hintPendingRef = useRef(false)
+
+  const addMsg = useCallback((msg: Omit<CoachMessage, 'id' | 'timestamp'>) => {
     setState(prev => ({
       ...prev,
-      coachMessages: [newMsg, ...prev.coachMessages.slice(0, 19)],
+      coachMessages: [{ ...msg, id: genId(), timestamp: Date.now() }, ...prev.coachMessages.slice(0, 24)],
     }))
   }, [])
 
-  // AI move executor — reads from stateRef so it's always fresh
-  const doAIMove = useCallback(() => {
-    const prev = stateRef.current
-    const chess = new Chess(prev.fen)
-    if (chess.turn() !== 'b' || chess.isGameOver()) {
-      setState(s => ({ ...s, isThinking: false }))
+  // ── Stockfish callbacks ────────────────────────────────────────────────────
+  const handleBestMove = useCallback((move: { from: string; to: string; promotion?: string }) => {
+    if (hintPendingRef.current) {
+      // This was a hint request
+      hintPendingRef.current = false
+      setState(prev => {
+        const chess = new Chess(prev.fen)
+        const legal = chess.moves({ verbose: true }) as Move[]
+        const match = legal.find(m => m.from === move.from && m.to === move.to)
+        if (!match) return prev
+        setTimeout(() => {
+          addMsg({
+            type: 'hint',
+            title: 'Hint',
+            content: `Consider ${match.san}. This move ${
+              match.captured ? 'captures material' :
+              match.flags.includes('k') || match.flags.includes('q') ? 'castles for king safety' :
+              'improves your position'
+            }. Look at how it affects piece activity and center control.`,
+            move: match.san,
+          })
+        }, 0)
+        return { ...prev, hintMove: { from: move.from as Square, to: move.to as Square } }
+      })
       return
     }
 
-    const depth = DIFFICULTY_DEPTH[prev.difficulty]
-    const bestMove = getBestMove(chess, depth)
-    if (!bestMove) {
-      setState(s => ({ ...s, isThinking: false }))
-      return
-    }
+    // Normal AI move
+    setState(prev => {
+      if (prev.turn !== 'b' || prev.isGameOver) return { ...prev, isThinking: false }
 
-    chess.move(bestMove)
-    const newState = buildState(chess, {
-      lastMove: { from: bestMove.from as Square, to: bestMove.to as Square },
-      selectedSquare: null,
-      validMoves: [],
-      isThinking: false,
-      hintMove: null,
+      const chess = new Chess(prev.fen)
+      const legal = chess.moves({ verbose: true }) as Move[]
+      const match = legal.find(m =>
+        m.from === move.from && m.to === move.to &&
+        (!move.promotion || m.promotion === move.promotion)
+      )
+      if (!match) return { ...prev, isThinking: false }
+
+      chess.move(match)
+      const derived = derivedState(chess)
+
+      setTimeout(() => {
+        if (chess.isCheckmate()) {
+          addMsg({ type: 'info', title: 'Checkmate', content: 'Stockfish delivers checkmate. Study the final position to understand the winning pattern and apply it in future games.' })
+        } else if (chess.isCheck()) {
+          addMsg({ type: 'info', title: 'Check!', content: `Stockfish plays ${match.san}, putting your king in check. You must block, capture the attacker, or move your king.` })
+        } else if (match.captured) {
+          addMsg({ type: 'info', title: 'Stockfish captures', content: `${match.san} — Stockfish takes your ${pieceLabel(match.captured)}. Think about how to recover material balance or find compensation.` })
+        }
+      }, 0)
+
+      return {
+        ...prev,
+        ...derived,
+        lastMove: { from: match.from as Square, to: match.to as Square },
+        selectedSquare: null,
+        validMoves: [],
+        isThinking: false,
+        hintMove: null,
+      }
     })
+  }, [addMsg])
 
-    setState(prev => ({ ...prev, ...newState, moveCount: prev.moveCount + 1 }))
+  const { requestMove, requestHintMove, stop } = useStockfish({
+    onBestMove: handleBestMove,
+    onReady: () => {
+      // Engine ready — nothing to do at start
+    },
+  })
 
-    // Coach feedback after AI move
-    if (chess.isCheckmate()) {
-      addMessage({ type: 'info', title: 'Checkmate', content: 'The AI delivers checkmate. Review the game to learn from the pattern and keep practicing!' })
-    } else if (chess.isCheck()) {
-      addMessage({ type: 'info', title: 'AI puts you in check!', content: `The AI played ${bestMove.san}, putting your king in check. You must address this immediately — look for ways to block, capture, or move your king.` })
-    } else if (bestMove.captured) {
-      addMessage({ type: 'info', title: 'AI captures a piece', content: `The AI took your ${bestMove.captured.toUpperCase()} with ${bestMove.san}. Think about how to recapture or compensate for the material loss.` })
-    }
-  }, [addMessage])
-
-  // Schedule AI move with thinking delay
-  const scheduleAIMove = useCallback((delay: number) => {
-    setState(s => ({ ...s, isThinking: true }))
-    if (thinkingTimeout.current) clearTimeout(thinkingTimeout.current)
-    thinkingTimeout.current = setTimeout(doAIMove, delay)
-  }, [doAIMove])
-
-  // Handle square click
+  // ── Square click handler ──────────────────────────────────────────────────
   const handleSquareClick = useCallback((square: Square) => {
     setState(prev => {
       if (prev.isGameOver || prev.isThinking) return prev
 
-      const chess = new Chess(prev.isExploringParallel && prev.parallelFen ? prev.parallelFen : prev.fen)
+      const fen = prev.isExploringParallel && prev.parallelFen ? prev.parallelFen : prev.fen
+      const chess = new Chess(fen)
 
-      // ---- PARALLEL EXPLORER MODE ----
+      // ── PARALLEL EXPLORER ──
       if (prev.isExploringParallel) {
         if (prev.selectedSquare && prev.selectedSquare !== square) {
-          const movesToSquare = chess.moves({ square: prev.selectedSquare, verbose: true }) as Move[]
-          const match = movesToSquare.find(m => m.to === square)
+          const legal = chess.moves({ square: prev.selectedSquare, verbose: true }) as Move[]
+          const match = legal.find(m => m.to === square)
           if (match) {
             chess.move(match)
-            return {
-              ...prev,
-              parallelFen: chess.fen(),
-              parallelMoves: [...prev.parallelMoves, match],
-              selectedSquare: null,
-              validMoves: [],
-            }
+            return { ...prev, parallelFen: chess.fen(), parallelMoves: [...prev.parallelMoves, match], selectedSquare: null, validMoves: [] }
           }
         }
         const piece = chess.get(square)
         if (piece && piece.color === chess.turn()) {
-          const moves = chess.moves({ square, verbose: true }) as Move[]
-          return { ...prev, selectedSquare: square, validMoves: moves.map(m => m.to as Square) }
+          const legal = chess.moves({ square, verbose: true }) as Move[]
+          return { ...prev, selectedSquare: square, validMoves: legal.map(m => m.to as Square) }
         }
         return { ...prev, selectedSquare: null, validMoves: [] }
       }
 
-      // ---- NORMAL GAME (white's turn) ----
+      // ── NORMAL GAME (white's turn only) ──
       if (chess.turn() !== 'w') return prev
 
       if (prev.selectedSquare && prev.selectedSquare !== square) {
-        const movesToSquare = chess.moves({ square: prev.selectedSquare, verbose: true }) as Move[]
-        const match = movesToSquare.find(m => m.to === square)
+        const legal = chess.moves({ square: prev.selectedSquare, verbose: true }) as Move[]
+        const match = legal.find(m => m.to === square)
 
         if (match) {
           const fenBefore = prev.fen
 
-          // Detect blunder: compare move quality vs best available
-          let isBlunder = false
-          let bestForPlayer: Move | null = null
-          {
-            const evalChess = new Chess(fenBefore)
-            const allMoves = evalChess.moves({ verbose: true }) as Move[]
-            let bestVal = Infinity
-            for (const m of allMoves) {
-              evalChess.move(m)
-              const v = evaluateBoard(evalChess)
-              evalChess.undo()
-              if (v < bestVal) { bestVal = v; bestForPlayer = m }
-            }
-            const moveChess = new Chess(fenBefore)
-            moveChess.move(match)
-            const moveVal = evaluateBoard(moveChess)
-            isBlunder = moveVal - bestVal > 150 && bestForPlayer?.san !== match.san
+          // Pawn promotion — show promotion UI instead of moving immediately
+          if (match.flags.includes('p')) {
+            return { ...prev, pendingPromotion: { from: prev.selectedSquare, to: square }, selectedSquare: null, validMoves: [] }
           }
 
+          // Blunder detection (quick local eval)
+          const { isBlunder, bestSan } = getBlunderSeverity(fenBefore, match)
+
           chess.move(match)
-          const newState = buildState(chess, {
+          const derived = derivedState(chess)
+
+          const newState: GameState = {
+            ...prev,
+            ...derived,
+            lastMove: { from: prev.selectedSquare, to: square },
             selectedSquare: null,
             validMoves: [],
-            lastMove: { from: prev.selectedSquare, to: square },
             hintMove: null,
-          })
-
-          const fullNew: GameState = {
-            ...prev,
-            ...newState,
+            isThinking: !chess.isGameOver(),
             moveCount: prev.moveCount + 1,
           }
 
           if (!chess.isGameOver()) {
-            // Queue coaching message + AI move
-            const delay = isBlunder ? 800 : 300
             setTimeout(() => {
-              if (isBlunder && bestForPlayer) {
-                addMessage({
+              if (isBlunder && bestSan) {
+                addMsg({
                   type: 'blunder',
                   title: 'Blunder Detected!',
-                  content: `Playing ${match.san} is a mistake — it gives away a significant positional or material advantage. The better move was ${bestForPlayer.san}.`,
+                  content: `Playing ${match.san} loses significant advantage. The engine suggests ${bestSan} was stronger. Use the Explore button to see how ${bestSan} plays out.`,
                   move: match.san,
-                  betterMove: bestForPlayer.san,
+                  betterMove: bestSan,
                 })
-                // Set up parallel exploration from before the blunder
                 setState(s => ({ ...s, parallelFen: fenBefore, parallelMoves: [] }))
               } else if (chess.isCheck()) {
-                addMessage({ type: 'good', title: 'Check!', content: `Well done — ${match.san} puts the opponent in check! Maintain pressure and look for follow-up tactics.` })
+                addMsg({ type: 'good', title: 'Check!', content: `${match.san} puts the king in check — great tactical vision! Now look for follow-up threats.` })
               } else if (match.captured) {
-                addMessage({ type: 'good', title: 'Capture!', content: `Good capture with ${match.san}. You've gained material. Watch for any counterplay from the AI.` })
+                addMsg({ type: 'good', title: 'Capture!', content: `${match.san} wins the ${pieceLabel(match.captured)}. Evaluate if Stockfish has any dangerous recaptures before continuing your plan.` })
               } else if (match.flags.includes('k') || match.flags.includes('q')) {
-                addMessage({ type: 'good', title: 'Castled!', content: `Excellent — castling improves your king safety and connects your rooks. Now focus on activating all your pieces.` })
+                addMsg({ type: 'good', title: 'Castled!', content: 'Good — your king is safer now and your rooks are connected. Focus on activating your remaining pieces.' })
               }
-              scheduleAIMove(delay)
+              requestMove(chess.fen(), stateRef.current.difficulty)
+            }, 0)
+          } else {
+            setTimeout(() => {
+              if (chess.isCheckmate()) {
+                addMsg({ type: 'good', title: 'Checkmate — You Win!', content: 'Excellent play! You delivered checkmate. Study the mating pattern to use it again in future games.' })
+              }
             }, 0)
           }
 
-          return fullNew
+          return newState
         }
       }
 
-      // Select or re-select a piece
+      // Select a piece
       const piece = chess.get(square)
       if (piece && piece.color === 'w') {
-        const moves = chess.moves({ square, verbose: true }) as Move[]
-        return { ...prev, selectedSquare: square, validMoves: moves.map(m => m.to as Square) }
+        const legal = chess.moves({ square, verbose: true }) as Move[]
+        return { ...prev, selectedSquare: square, validMoves: legal.map(m => m.to as Square) }
       }
 
       return { ...prev, selectedSquare: null, validMoves: [] }
     })
-  }, [addMessage, scheduleAIMove])
+  }, [addMsg, requestMove])
 
-  // Takeback: undo the last player + AI move pair
-  const takeback = useCallback(() => {
+  // ── Promotion ──────────────────────────────────────────────────────────────
+  const handlePromotion = useCallback((piece: 'q' | 'r' | 'b' | 'n') => {
     setState(prev => {
-      if (prev.history.length < 2) return prev
+      if (!prev.pendingPromotion) return prev
       const chess = new Chess(prev.fen)
-      chess.undo() // AI move
-      chess.undo() // player move
-      const newState = buildState(chess, {
+      const { from, to } = prev.pendingPromotion
+      const match = (chess.moves({ verbose: true }) as Move[]).find(
+        m => m.from === from && m.to === to && m.promotion === piece
+      )
+      if (!match) return { ...prev, pendingPromotion: null }
+
+      chess.move(match)
+      const derived = derivedState(chess)
+      const newState: GameState = {
+        ...prev, ...derived,
+        lastMove: { from, to },
+        pendingPromotion: null,
         selectedSquare: null,
         validMoves: [],
         hintMove: null,
-        isThinking: false,
-        lastMove: chess.history({ verbose: true }).length > 0
-          ? (() => {
-              const h = chess.history({ verbose: true }) as Move[]
-              const last = h[h.length - 1]
-              return { from: last.from as Square, to: last.to as Square }
-            })()
-          : null,
-      })
-      setTimeout(() => addMessage({
-        type: 'info',
-        title: 'Move Taken Back',
-        content: 'Your last move has been undone. Use this opportunity to try a different approach and learn from the position.',
-      }), 0)
-      return {
-        ...prev,
-        ...newState,
-        moveCount: Math.max(0, prev.moveCount - 2),
-        isCheckmate: false,
-        isDraw: false,
-        isGameOver: false,
+        isThinking: !chess.isGameOver(),
+        moveCount: prev.moveCount + 1,
       }
+      if (!chess.isGameOver()) {
+        setTimeout(() => requestMove(chess.fen(), stateRef.current.difficulty), 0)
+      }
+      return newState
     })
-    if (thinkingTimeout.current) clearTimeout(thinkingTimeout.current)
-  }, [addMessage])
+  }, [requestMove])
 
-  // Hint: show the best move highlighted on the board
+  // ── Takeback ──────────────────────────────────────────────────────────────
+  const takeback = useCallback(() => {
+    stop()
+    setState(prev => {
+      if (prev.history.length < 2) return prev
+      const chess = new Chess(prev.fen)
+      chess.undo()
+      chess.undo()
+      const derived = derivedState(chess)
+      const hist = chess.history({ verbose: true }) as Move[]
+      const lastMove = hist.length > 0 ? { from: hist[hist.length - 1].from as Square, to: hist[hist.length - 1].to as Square } : null
+      setTimeout(() => addMsg({ type: 'info', title: 'Takeback', content: 'Move undone. Use this chance to find a stronger continuation — think about what the engine might exploit.' }), 0)
+      return { ...prev, ...derived, lastMove, selectedSquare: null, validMoves: [], hintMove: null, isThinking: false, moveCount: Math.max(0, prev.moveCount - 2), isCheckmate: false, isDraw: false, isGameOver: false }
+    })
+  }, [addMsg, stop])
+
+  // ── Hint ──────────────────────────────────────────────────────────────────
   const requestHint = useCallback(() => {
     setState(prev => {
       if (prev.turn !== 'w' || prev.isThinking || prev.isGameOver) return prev
-      const chess = new Chess(prev.fen)
-      const best = getBestMove(chess, 3)
-      if (!best) return prev
-      setTimeout(() => addMessage({
-        type: 'hint',
-        title: 'Hint',
-        content: `Consider playing ${best.san}. This move follows strong chess principles — look at how it affects piece activity, center control, or king safety.`,
-        move: best.san,
-      }), 0)
-      return { ...prev, hintMove: { from: best.from as Square, to: best.to as Square } }
+      hintPendingRef.current = true
+      setTimeout(() => requestHintMove(prev.fen), 0)
+      return prev
     })
-  }, [addMessage])
+  }, [requestHintMove])
 
-  // Start parallel board exploration from a given FEN
+  // ── Parallel exploration ───────────────────────────────────────────────────
   const startParallelExploration = useCallback((fromFen: string) => {
-    setState(prev => ({
-      ...prev,
-      parallelFen: fromFen,
-      parallelMoves: [],
-      isExploringParallel: true,
-      selectedSquare: null,
-      validMoves: [],
-    }))
-    addMessage({
-      type: 'analysis',
-      title: 'Parallel Explorer Active',
-      content: 'You are now exploring an alternate line in parallel. Make moves freely to see how the game could have unfolded differently. Click "Exit Explorer" when done.',
-    })
-  }, [addMessage])
+    setState(prev => ({ ...prev, parallelFen: fromFen, parallelMoves: [], isExploringParallel: true, selectedSquare: null, validMoves: [] }))
+    addMsg({ type: 'analysis', title: 'Parallel Explorer Active', content: 'Exploring an alternate line. Move freely to see how the position could have unfolded. Click Exit Explorer when done.' })
+  }, [addMsg])
 
   const exitParallelExploration = useCallback(() => {
-    setState(prev => ({
-      ...prev,
-      isExploringParallel: false,
-      parallelFen: null,
-      parallelMoves: [],
-      selectedSquare: null,
-      validMoves: [],
-    }))
+    setState(prev => ({ ...prev, isExploringParallel: false, parallelFen: null, parallelMoves: [], selectedSquare: null, validMoves: [] }))
   }, [])
 
+  // ── Difficulty ────────────────────────────────────────────────────────────
   const setDifficulty = useCallback((difficulty: Difficulty) => {
     setState(prev => ({ ...prev, difficulty }))
-    addMessage({
+    addMsg({
       type: 'info',
-      title: 'Difficulty Changed',
-      content: `Difficulty set to ${difficulty}. ${
-        difficulty === 'beginner' ? 'The AI will make occasional mistakes — good for learning fundamentals.' :
-        difficulty === 'intermediate' ? 'The AI plays solid fundamental chess — a good challenge for improving players.' :
-        difficulty === 'advanced' ? 'The AI plays strong tactical chess — test your calculation skills!' :
-        'The AI plays at near-grandmaster level. Only for the brave!'
-      }`,
+      title: 'Difficulty Updated',
+      content: difficulty === 'beginner' ? 'Beginner mode: Stockfish plays at ~800 ELO. Good for learning basics.' :
+               difficulty === 'intermediate' ? 'Intermediate: ~1500 ELO. Solid tactical play.' :
+               difficulty === 'advanced' ? 'Advanced: ~2000 ELO. Near-expert level.' :
+               'Master: Full Stockfish strength. Prepare for a serious challenge!',
     })
-  }, [addMessage])
+  }, [addMsg])
 
+  // ── New game ──────────────────────────────────────────────────────────────
   const newGame = useCallback(() => {
-    if (thinkingTimeout.current) clearTimeout(thinkingTimeout.current)
+    stop()
     setState(prev => ({
       ...INITIAL_STATE,
       difficulty: prev.difficulty,
       coachMessages: [{
-        id: generateId(),
+        id: genId(),
         type: 'info',
-        title: 'New Game Started',
-        content: "Good luck! Focus on controlling the center with pawns and knights, develop bishops early, and castle to protect your king. I'll coach you through every move.",
+        title: 'New Game',
+        content: 'Game reset. Good luck! Remember: control the center, develop your pieces, and castle early. I\'ll coach you through every move.',
         timestamp: Date.now(),
       }],
     }))
-  }, [])
+  }, [stop])
 
   return {
     state,
     handleSquareClick,
+    handlePromotion,
     takeback,
     requestHint,
     startParallelExploration,
@@ -346,4 +338,8 @@ export function useChessGame() {
     setDifficulty,
     newGame,
   }
+}
+
+function pieceLabel(type: string): string {
+  return ({ p: 'pawn', n: 'knight', b: 'bishop', r: 'rook', q: 'queen', k: 'king' })[type] ?? type
 }

@@ -1,4 +1,5 @@
-// Chess game types and shared state
+// Chess types, evaluation utilities, and shared state
+// Stockfish is handled via useStockfish hook — this module contains only types + local eval utils
 import { Chess, Square, Move, Piece } from 'chess.js'
 
 export type Difficulty = 'beginner' | 'intermediate' | 'advanced' | 'master'
@@ -34,13 +35,21 @@ export interface GameState {
   isThinking: boolean
   hintMove: { from: Square; to: Square } | null
   moveCount: number
+  pendingPromotion: { from: Square; to: Square } | null
 }
 
 export const DIFFICULTY_DEPTH: Record<Difficulty, number> = {
-  beginner: 1,
-  intermediate: 3,
-  advanced: 5,
-  master: 7,
+  beginner: 2,
+  intermediate: 8,
+  advanced: 14,
+  master: 20,
+}
+
+export const DIFFICULTY_ELO: Record<Difficulty, number> = {
+  beginner: 800,
+  intermediate: 1500,
+  advanced: 2000,
+  master: 3000,
 }
 
 export const DIFFICULTY_LABELS: Record<Difficulty, string> = {
@@ -73,67 +82,14 @@ export const INITIAL_STATE: GameState = {
   isThinking: false,
   hintMove: null,
   moveCount: 0,
+  pendingPromotion: null,
 }
 
-// Minimax-based AI engine (runs client-side)
+// ─── Local evaluation (for blunder detection only, lightweight) ────────────────
+
 const PIECE_VALUES: Record<string, number> = {
   p: 100, n: 320, b: 330, r: 500, q: 900, k: 20000,
 }
-
-const PAWN_TABLE = [
-  0,  0,  0,  0,  0,  0,  0,  0,
-  50, 50, 50, 50, 50, 50, 50, 50,
-  10, 10, 20, 30, 30, 20, 10, 10,
-  5,  5, 10, 25, 25, 10,  5,  5,
-  0,  0,  0, 20, 20,  0,  0,  0,
-  5, -5,-10,  0,  0,-10, -5,  5,
-  5, 10, 10,-20,-20, 10, 10,  5,
-  0,  0,  0,  0,  0,  0,  0,  0,
-]
-
-const KNIGHT_TABLE = [
-  -50,-40,-30,-30,-30,-30,-40,-50,
-  -40,-20,  0,  0,  0,  0,-20,-40,
-  -30,  0, 10, 15, 15, 10,  0,-30,
-  -30,  5, 15, 20, 20, 15,  5,-30,
-  -30,  0, 15, 20, 20, 15,  0,-30,
-  -30,  5, 10, 15, 15, 10,  5,-30,
-  -40,-20,  0,  5,  5,  0,-20,-40,
-  -50,-40,-30,-30,-30,-30,-40,-50,
-]
-
-const BISHOP_TABLE = [
-  -20,-10,-10,-10,-10,-10,-10,-20,
-  -10,  0,  0,  0,  0,  0,  0,-10,
-  -10,  0,  5, 10, 10,  5,  0,-10,
-  -10,  5,  5, 10, 10,  5,  5,-10,
-  -10,  0, 10, 10, 10, 10,  0,-10,
-  -10, 10, 10, 10, 10, 10, 10,-10,
-  -10,  5,  0,  0,  0,  0,  5,-10,
-  -20,-10,-10,-10,-10,-10,-10,-20,
-]
-
-const ROOK_TABLE = [
-  0,  0,  0,  0,  0,  0,  0,  0,
-  5, 10, 10, 10, 10, 10, 10,  5,
- -5,  0,  0,  0,  0,  0,  0, -5,
- -5,  0,  0,  0,  0,  0,  0, -5,
- -5,  0,  0,  0,  0,  0,  0, -5,
- -5,  0,  0,  0,  0,  0,  0, -5,
- -5,  0,  0,  0,  0,  0,  0, -5,
-  0,  0,  0,  5,  5,  0,  0,  0,
-]
-
-const QUEEN_TABLE = [
-  -20,-10,-10, -5, -5,-10,-10,-20,
-  -10,  0,  0,  0,  0,  0,  0,-10,
-  -10,  0,  5,  5,  5,  5,  0,-10,
-   -5,  0,  5,  5,  5,  5,  0, -5,
-    0,  0,  5,  5,  5,  5,  0, -5,
-  -10,  5,  5,  5,  5,  5,  0,-10,
-  -10,  0,  5,  0,  0,  0,  0,-10,
-  -20,-10,-10, -5, -5,-10,-10,-20,
-]
 
 function squareIndex(sq: Square): number {
   const col = sq.charCodeAt(0) - 97
@@ -141,99 +97,61 @@ function squareIndex(sq: Square): number {
   return (7 - row) * 8 + col
 }
 
+const PST: Record<string, number[]> = {
+  p: [0,0,0,0,0,0,0,0,50,50,50,50,50,50,50,50,10,10,20,30,30,20,10,10,5,5,10,25,25,10,5,5,0,0,0,20,20,0,0,0,5,-5,-10,0,0,-10,-5,5,5,10,10,-20,-20,10,10,5,0,0,0,0,0,0,0,0],
+  n: [-50,-40,-30,-30,-30,-30,-40,-50,-40,-20,0,0,0,0,-20,-40,-30,0,10,15,15,10,0,-30,-30,5,15,20,20,15,5,-30,-30,0,15,20,20,15,0,-30,-30,5,10,15,15,10,5,-30,-40,-20,0,5,5,0,-20,-40,-50,-40,-30,-30,-30,-30,-40,-50],
+  b: [-20,-10,-10,-10,-10,-10,-10,-20,-10,0,0,0,0,0,0,-10,-10,0,5,10,10,5,0,-10,-10,5,5,10,10,5,5,-10,-10,0,10,10,10,10,0,-10,-10,10,10,10,10,10,10,-10,-10,5,0,0,0,0,5,-10,-20,-10,-10,-10,-10,-10,-10,-20],
+  r: [0,0,0,0,0,0,0,0,5,10,10,10,10,10,10,5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,0,0,0,5,5,0,0,0],
+  q: [-20,-10,-10,-5,-5,-10,-10,-20,-10,0,0,0,0,0,0,-10,-10,0,5,5,5,5,0,-10,-5,0,5,5,5,5,0,-5,0,0,5,5,5,5,0,-5,-10,5,5,5,5,5,0,-10,-10,0,5,0,0,0,0,-10,-20,-10,-10,-5,-5,-10,-10,-20],
+  k: [-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-20,-30,-30,-40,-40,-30,-30,-20,-10,-20,-20,-20,-20,-20,-20,-10,20,20,0,0,0,0,20,20,20,30,10,0,0,10,30,20],
+}
+
 function evalPiece(type: string, color: string, sq: Square): number {
-  const base = PIECE_VALUES[type] || 0
+  const base = PIECE_VALUES[type] ?? 0
+  const table = PST[type]
+  if (!table) return base
   const idx = color === 'w' ? squareIndex(sq) : 63 - squareIndex(sq)
-  let bonus = 0
-  if (type === 'p') bonus = PAWN_TABLE[idx]
-  else if (type === 'n') bonus = KNIGHT_TABLE[idx]
-  else if (type === 'b') bonus = BISHOP_TABLE[idx]
-  else if (type === 'r') bonus = ROOK_TABLE[idx]
-  else if (type === 'q') bonus = QUEEN_TABLE[idx]
-  return base + bonus
+  return base + (table[idx] ?? 0)
 }
 
 export function evaluateBoard(chess: Chess): number {
   let score = 0
-  const board = chess.board()
-  for (const row of board) {
+  for (const row of chess.board()) {
     for (const cell of row) {
       if (!cell) continue
-      const val = evalPiece(cell.type, cell.color, cell.square)
-      score += cell.color === 'b' ? val : -val
+      const v = evalPiece(cell.type, cell.color, cell.square)
+      score += cell.color === 'b' ? v : -v
     }
   }
   return score
 }
 
-export function minimax(
-  chess: Chess,
-  depth: number,
-  alpha: number,
-  beta: number,
-  maximizing: boolean
-): number {
-  if (depth === 0 || chess.isGameOver()) {
-    if (chess.isCheckmate()) return maximizing ? -Infinity : Infinity
-    if (chess.isDraw()) return 0
-    return evaluateBoard(chess)
-  }
-
-  const moves = chess.moves({ verbose: true })
-  if (maximizing) {
-    let maxEval = -Infinity
-    for (const move of moves) {
-      chess.move(move)
-      const val = minimax(chess, depth - 1, alpha, beta, false)
-      chess.undo()
-      maxEval = Math.max(maxEval, val)
-      alpha = Math.max(alpha, val)
-      if (beta <= alpha) break
-    }
-    return maxEval
-  } else {
-    let minEval = Infinity
-    for (const move of moves) {
-      chess.move(move)
-      const val = minimax(chess, depth - 1, alpha, beta, true)
-      chess.undo()
-      minEval = Math.min(minEval, val)
-      beta = Math.min(beta, val)
-      if (beta <= alpha) break
-    }
-    return minEval
-  }
+/** Quick 1-ply evaluation for blunder detection (before Stockfish responds) */
+export function quickEval(fen: string): number {
+  return evaluateBoard(new Chess(fen))
 }
 
-export function getBestMove(chess: Chess, depth: number): Move | null {
-  const moves = chess.moves({ verbose: true })
-  if (!moves.length) return null
+/** Returns centipawn loss for a given move vs best 1-ply alternative */
+export function getBlunderSeverity(fenBefore: string, playedMove: Move): { isBlunder: boolean; cpLoss: number; bestSan: string | null } {
+  const c = new Chess(fenBefore)
+  const allMoves = c.moves({ verbose: true }) as Move[]
+  if (allMoves.length === 0) return { isBlunder: false, cpLoss: 0, bestSan: null }
 
-  let bestMove: Move | null = null
   let bestVal = Infinity
-
-  // Add a little randomness for beginner
-  const shuffled = depth <= 1
-    ? [...moves].sort(() => Math.random() - 0.5)
-    : moves
-
-  for (const move of shuffled) {
-    chess.move(move)
-    const val = minimax(chess, depth - 1, -Infinity, Infinity, true)
-    chess.undo()
-    if (val < bestVal) {
-      bestVal = val
-      bestMove = move
-    }
+  let bestSan: string | null = null
+  for (const m of allMoves) {
+    c.move(m)
+    const v = evaluateBoard(c)
+    c.undo()
+    if (v < bestVal) { bestVal = v; bestSan = m.san }
   }
-  return bestMove
-}
 
-export function getMoveDelta(fen: string, move: Move): number {
-  const before = new Chess(fen)
-  const evalBefore = evaluateBoard(before)
-  const after = new Chess(fen)
-  after.move(move)
-  const evalAfter = evaluateBoard(after)
-  return evalAfter - evalBefore
+  c.move(playedMove)
+  const playedVal = evaluateBoard(c)
+  const cpLoss = playedVal - bestVal
+  return {
+    isBlunder: cpLoss > 120 && bestSan !== playedMove.san,
+    cpLoss,
+    bestSan,
+  }
 }
