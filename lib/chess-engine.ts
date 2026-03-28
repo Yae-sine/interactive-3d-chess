@@ -50,8 +50,10 @@ export const DIFFICULTY_LABELS: Record<Difficulty, string> = {
   master: 'Master',
 }
 
+export const INITIAL_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+
 export const INITIAL_STATE: GameState = {
-  fen: new Chess().fen(),
+  fen: INITIAL_FEN,
   history: [],
   capturedWhite: [],
   capturedBlack: [],
