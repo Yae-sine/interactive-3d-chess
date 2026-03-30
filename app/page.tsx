@@ -5,10 +5,13 @@ import GameHUD from '@/components/chess/GameHUD'
 import CoachPanel from '@/components/chess/CoachPanel'
 import CapturedPieces from '@/components/chess/CapturedPieces'
 import Board3D from '@/components/chess/Board3D'
+import CheckmateDialog from '@/components/chess/CheckmateDialog'
 
 export default function ChessPage() {
   const {
     state,
+    showCheckmateDialog,
+    closeCheckmateDialog,
     handleSquareClick,
     handlePromotion,
     takeback,
@@ -18,6 +21,9 @@ export default function ChessPage() {
     setDifficulty,
     newGame,
   } = useChessGame()
+
+  // Determine winner: if it's white's turn and checkmate, AI (black) won; otherwise player (white) won
+  const checkmateWinner = state.turn === 'w' ? 'ai' : 'player'
 
   return (
     <main className="flex h-screen overflow-hidden bg-[#0a0908]">
@@ -109,6 +115,15 @@ export default function ChessPage() {
           moveHistory={state.history.map(m => m.san)}
         />
       </aside>
+
+      {/* Checkmate Dialog */}
+      <CheckmateDialog
+        open={showCheckmateDialog}
+        onOpenChange={closeCheckmateDialog}
+        winner={checkmateWinner}
+        moveHistory={state.history.map(m => m.san)}
+        onNewGame={newGame}
+      />
     </main>
   )
 }

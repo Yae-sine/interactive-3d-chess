@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { Chess, Square, Move, Piece } from 'chess.js'
 import {
   GameState, INITIAL_STATE, CoachMessage, Difficulty,
@@ -11,8 +11,9 @@ import { useStockfish } from './use-stockfish'
 let _idCounter = 0
 function genId() { return `msg_${++_idCounter}_${Date.now()}` }
 
-function derivedState(chess: Chess): Partial<GameState> {
-  const history = chess.history({ verbose: true }) as Move[]
+function derivedState(chess: Chess, prevHistory: Move[], newMove: Move | null): Partial<GameState> {
+  // Append the new move to existing history (chess.history() resets when created from FEN)
+  const history = newMove ? [...prevHistory, newMove] : prevHistory
   const capturedWhite: Piece[] = []
   const capturedBlack: Piece[] = []
   for (const m of history) {
@@ -46,6 +47,10 @@ export function useChessGame() {
       timestamp: Date.now(),
     }],
   }))
+
+  // Track checkmate dialog visibility separately to avoid re-triggering
+  const [showCheckmateDialog, setShowCheckmateDialog] = useState(false)
+  const checkmateShownRef = useRef(false)
 
   const stateRef = useRef(state)
   stateRef.current = state
@@ -100,7 +105,7 @@ export function useChessGame() {
       if (!match) return { ...prev, isThinking: false }
 
       chess.move(match)
-      const derived = derivedState(chess)
+      const derived = derivedState(chess, prev.history, match)
 
       setTimeout(() => {
         if (chess.isCheckmate()) {
@@ -130,6 +135,16 @@ export function useChessGame() {
       // Engine ready — nothing to do at start
     },
   })
+
+  // Show checkmate dialog when checkmate occurs
+  useEffect(() => {
+    if (state.isCheckmate && !checkmateShownRef.current) {
+      checkmateShownRef.current = true
+      // Small delay to let the final move animate
+      const timer = setTimeout(() => setShowCheckmateDialog(true), 500)
+      return () => clearTimeout(timer)
+    }
+  }, [state.isCheckmate])
 
   // ── Square click handler ──────────────────────────────────────────────────
   const handleSquareClick = useCallback((square: Square) => {
@@ -176,7 +191,7 @@ export function useChessGame() {
           const { isBlunder, bestSan } = getBlunderSeverity(fenBefore, match)
 
           chess.move(match)
-          const derived = derivedState(chess)
+          const derived = derivedState(chess, prev.history, match)
 
           const newState: GameState = {
             ...prev,
@@ -244,7 +259,7 @@ export function useChessGame() {
       if (!match) return { ...prev, pendingPromotion: null }
 
       chess.move(match)
-      const derived = derivedState(chess)
+      const derived = derivedState(chess, prev.history, match)
       const newState: GameState = {
         ...prev, ...derived,
         lastMove: { from, to },
@@ -270,9 +285,10 @@ export function useChessGame() {
       const chess = new Chess(prev.fen)
       chess.undo()
       chess.undo()
-      const derived = derivedState(chess)
-      const hist = chess.history({ verbose: true }) as Move[]
-      const lastMove = hist.length > 0 ? { from: hist[hist.length - 1].from as Square, to: hist[hist.length - 1].to as Square } : null
+      // Remove last 2 moves from history
+      const newHistory = prev.history.slice(0, -2)
+      const derived = derivedState(chess, newHistory, null)
+      const lastMove = newHistory.length > 0 ? { from: newHistory[newHistory.length - 1].from as Square, to: newHistory[newHistory.length - 1].to as Square } : null
       setTimeout(() => addMsg({ type: 'info', title: 'Takeback', content: 'Move undone. Use this chance to find a stronger continuation — think about what the engine might exploit.' }), 0)
       return { ...prev, ...derived, lastMove, selectedSquare: null, validMoves: [], hintMove: null, isThinking: false, moveCount: Math.max(0, prev.moveCount - 2), isCheckmate: false, isDraw: false, isGameOver: false }
     })
@@ -314,6 +330,8 @@ export function useChessGame() {
   // ── New game ──────────────────────────────────────────────────────────────
   const newGame = useCallback(() => {
     stop()
+    checkmateShownRef.current = false
+    setShowCheckmateDialog(false)
     setState(prev => ({
       ...INITIAL_STATE,
       difficulty: prev.difficulty,
@@ -327,8 +345,15 @@ export function useChessGame() {
     }))
   }, [stop])
 
+  // ── Close checkmate dialog ──────────────────────────────────────────────────
+  const closeCheckmateDialog = useCallback(() => {
+    setShowCheckmateDialog(false)
+  }, [])
+
   return {
     state,
+    showCheckmateDialog,
+    closeCheckmateDialog,
     handleSquareClick,
     handlePromotion,
     takeback,

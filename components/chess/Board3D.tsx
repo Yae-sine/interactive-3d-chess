@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useCallback, useRef, useMemo } from 'react'
+import React, { useState, useMemo } from 'react'
 import { Chess } from 'chess.js'
 import type { Square } from 'chess.js'
 
@@ -250,41 +250,8 @@ export default function Board3D({
     return { board, isCheck, turn, checkSquare }
   }, [displayFen])
 
-  // 3D tilt state
-  const [tilt, setTilt] = useState({ x: 24, y: 0 })
-  const [dragging, setDragging] = useState(false)
-  const dragRef = useRef<{ mx: number; my: number; tx: number; ty: number } | null>(null)
-
-  const onMouseDown = useCallback((e: React.MouseEvent) => {
-    if (e.button !== 0) return
-    dragRef.current = { mx: e.clientX, my: e.clientY, tx: tilt.x, ty: tilt.y }
-    setDragging(true)
-  }, [tilt])
-
-  const onMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!dragRef.current) return
-    setTilt({
-      x: Math.max(8, Math.min(55, dragRef.current.tx - (e.clientY - dragRef.current.my) * 0.25)),
-      y: dragRef.current.ty + (e.clientX - dragRef.current.mx) * 0.25,
-    })
-  }, [])
-
-  const stopDrag = useCallback(() => { dragRef.current = null; setDragging(false) }, [])
-
-  const onTouchStart = useCallback((e: React.TouchEvent) => {
-    const t = e.touches[0]
-    dragRef.current = { mx: t.clientX, my: t.clientY, tx: tilt.x, ty: tilt.y }
-    setDragging(true)
-  }, [tilt])
-
-  const onTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!dragRef.current) return
-    const t = e.touches[0]
-    setTilt({
-      x: Math.max(8, Math.min(55, dragRef.current.tx - (t.clientY - dragRef.current.my) * 0.25)),
-      y: dragRef.current.ty + (t.clientX - dragRef.current.mx) * 0.25,
-    })
-  }, [])
+  // Fixed board angle - no dragging
+  const tilt = { x: 24, y: 0 }
 
   const boardSize = 'min(60vmin, 520px)'
 
@@ -300,15 +267,10 @@ export default function Board3D({
           filter: 'blur(30px)' }} />
 
       {/* 3D perspective container */}
-      <div
-        style={{ perspective: '1200px', perspectiveOrigin: '50% 40%', cursor: dragging ? 'grabbing' : 'grab' }}
-        onMouseDown={onMouseDown} onMouseMove={onMouseMove} onMouseUp={stopDrag} onMouseLeave={stopDrag}
-        onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={stopDrag}
-      >
+      <div style={{ perspective: '1200px', perspectiveOrigin: '50% 40%' }}>
         <div style={{
           transform: `rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`,
           transformStyle: 'preserve-3d',
-          transition: dragging ? 'none' : 'transform 0.18s cubic-bezier(.25,.46,.45,.94)',
         }}>
           {/* Drop shadow plane */}
           <div aria-hidden="true" style={{
@@ -400,10 +362,10 @@ export default function Board3D({
         </div>
       )}
 
-      {/* Drag hint */}
+      {/* Click hint */}
       <p className="absolute bottom-3 left-1/2 -translate-x-1/2 text-xs pointer-events-none select-none tracking-widest uppercase"
         style={{ color: 'rgba(240,234,216,0.15)' }}>
-        Drag to rotate &middot; Click to move
+        Click to move
       </p>
     </div>
   )
