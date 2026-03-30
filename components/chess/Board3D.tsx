@@ -280,7 +280,7 @@ export default function Board3D({
             filter: 'blur(40px)',
             transform: 'translateZ(-10px)',
             borderRadius: '8px',
-            pointerEvents : 'none'
+            pointerEvents : 'none',
           }} />
 
           {/* Walnut outer frame */}
