@@ -91,7 +91,7 @@ export default function ChessPage() {
       </aside>
 
       {/* Center - Chess Board */}
-      <div className="flex-1 relative">
+      <div className="flex-1 relative isolate" style={{ overflow: 'visible' }}>
         <Board3D
           fen={state.fen}
           parallelFen={state.parallelFen}

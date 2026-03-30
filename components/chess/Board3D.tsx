@@ -145,7 +145,6 @@ function Square3D({
         boxShadow: isSelected ? 'inset 0 0 0 3px rgba(80,200,80,0.9)' :
                    isHint     ? 'inset 0 0 0 3px rgba(230,168,23,0.9)' : 'none',
         pointerEvents: 'auto',
-        zIndex: 1,
       }}
       className="flex items-center justify-center"
     >
@@ -258,8 +257,8 @@ export default function Board3D({
   const boardSize = 'min(60vmin, 520px)'
 
   return (
-    <div className="w-full h-full relative flex items-center justify-center"
-      style={{ background: 'radial-gradient(ellipse at 50% 30%, #1a1430 0%, #0d0b08 55%, #050305 100%)' }}>
+    <div className="w-full h-full relative flex items-center justify-center isolate"
+      style={{ background: 'radial-gradient(ellipse at 50% 30%, #1a1430 0%, #0d0b08 55%, #050305 100%)', overflow: 'visible' }}>
 
 
       {/* Ambient radial glow under board */}
@@ -269,10 +268,12 @@ export default function Board3D({
           filter: 'blur(30px)' }} />
 
       {/* 3D perspective container */}
-      <div style={{ perspective: '1200px', perspectiveOrigin: '50% 40%' }}>
+      <div style={{ pointerEvents: 'none' }}>
         <div style={{
-          transform: `rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`,
+          transform: `perspective(1200px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`,
           transformStyle: 'preserve-3d',
+          transformOrigin: '50% 40%',
+          pointerEvents: 'none',
         }}>
           {/* Drop shadow plane */}
           <div aria-hidden="true" style={{
@@ -298,7 +299,7 @@ export default function Board3D({
               '0 30px 100px rgba(0,0,0,0.95)',
               '0 4px 24px rgba(180,100,20,0.25)',
             ].join(', '),
-            transformStyle: 'preserve-3d',
+            pointerEvents: 'none',
           }}>
             {/* Wood grain on frame */}
             <div className="absolute inset-0 wood-grain rounded pointer-events-none opacity-40" aria-hidden="true" />
@@ -308,6 +309,7 @@ export default function Board3D({
               padding: '3px',
               borderRadius: '3px',
               background: 'linear-gradient(135deg, rgba(255,200,80,0.28) 0%, rgba(90,45,8,0.9) 45%, rgba(255,200,80,0.14) 100%)',
+              pointerEvents: 'none',
             }}>
               {/* Board grid */}
               <div style={{
@@ -319,7 +321,7 @@ export default function Board3D({
                 boxShadow: 'inset 0 0 40px rgba(0,0,0,0.35)',
                 pointerEvents: 'auto',
                 position: 'relative',
-                zIndex: 1,
+                transformStyle: 'flat',
               }}>
                 {RANKS.map((rank, ri) =>
                   FILES.map((file, fi) => {
