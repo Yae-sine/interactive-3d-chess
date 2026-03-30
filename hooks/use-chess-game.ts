@@ -17,12 +17,16 @@ function derivedState(chess: Chess, prevHistory: Move[], newMove: Move | null): 
   const capturedWhite: Piece[] = []
   const capturedBlack: Piece[] = []
   for (const m of history) {
-    if (m.captured) {
-      const p: Piece = { type: m.captured, color: m.color === 'w' ? 'b' : 'w' } as Piece
-      if (m.color === 'w') capturedWhite.push(p)
+    if(m.captured){
+      // The captured piece has opposite color of the mover
+      const capturedColor = m.color === 'w' ? 'b' : 'w'
+      const p: Piece = { type: m.captured, color: capturedColor } as Piece
+      // Push to array based on captured piece's color
+      if (capturedColor === 'w') capturedWhite.push(p)
       else capturedBlack.push(p)
     }
   }
+  
   return {
     fen: chess.fen(),
     history,

@@ -3,8 +3,8 @@
 import type { Piece } from 'chess.js'
 
 const PIECE_SYMBOLS: Record<string, Record<string, string>> = {
-  w: { k: '♔', q: '♕', r: '♖', b: '♗', n: '♘', p: '♙' },
-  b: { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' },
+  b: { k: '♔', q: '♕', r: '♖', b: '♗', n: '♘', p: '♙' },
+  w: { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' },
 }
 
 const PIECE_VALUES: Record<string, number> = {
@@ -16,9 +16,8 @@ interface CapturedPiecesProps {
   capturedBlack: Piece[]  // black pieces captured by white
 }
 
-function PieceRow({ pieces, label }: { pieces: Piece[]; label: string }) {
+function PieceRow({ pieces, label, advantage }: { pieces: Piece[]; label: string; advantage: number }) {
   const sorted = [...pieces].sort((a, b) => PIECE_VALUES[b.type] - PIECE_VALUES[a.type])
-  const totalValue = pieces.reduce((s, p) => s + PIECE_VALUES[p.type], 0)
 
   return (
     <div className="flex items-center gap-2">
@@ -30,8 +29,8 @@ function PieceRow({ pieces, label }: { pieces: Piece[]; label: string }) {
           </span>
         ))}
       </div>
-      {totalValue > 0 && (
-        <span className="text-xs text-muted-foreground font-mono">+{totalValue}</span>
+      {advantage > 0 && (
+        <span className="text-xs text-green-400 font-mono">+{advantage}</span>
       )}
     </div>
   )
@@ -40,14 +39,19 @@ function PieceRow({ pieces, label }: { pieces: Piece[]; label: string }) {
 export default function CapturedPieces({ capturedWhite, capturedBlack }: CapturedPiecesProps) {
   if (capturedWhite.length === 0 && capturedBlack.length === 0) return null
 
+  // Calculate material values
+  const whiteValue = capturedBlack.reduce((s, p) => s + PIECE_VALUES[p.type], 0) // what white captured
+  const blackValue = capturedWhite.reduce((s, p) => s + PIECE_VALUES[p.type], 0) // what black captured
+  const advantage = whiteValue - blackValue // positive = white ahead, negative = black ahead
+
   return (
     <div className="rounded-xl border border-border/40 bg-card px-3 py-2 space-y-1.5">
       <p className="text-xs text-muted-foreground font-medium mb-2">Captured Pieces</p>
       {capturedBlack.length > 0 && (
-        <PieceRow pieces={capturedBlack} label="You" />
+        <PieceRow pieces={capturedBlack} label="You" advantage={advantage > 0 ? advantage : 0} />
       )}
       {capturedWhite.length > 0 && (
-        <PieceRow pieces={capturedWhite} label="AI" />
+        <PieceRow pieces={capturedWhite} label="AI" advantage={advantage < 0 ? -advantage : 0} />
       )}
     </div>
   )

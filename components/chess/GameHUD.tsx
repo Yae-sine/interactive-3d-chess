@@ -62,10 +62,10 @@ export default function GameHUD({
   return (
     <div className="flex flex-col gap-3">
       {/* Status bar */}
-      <div className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-card border border-border/40">
-        <div className="flex items-center gap-2">
-          <div className={`w-3 h-3 rounded-full ${turn === 'w' ? 'bg-white ring-2 ring-white/30' : 'bg-slate-800 ring-2 ring-slate-600/50'}`} />
-          <span className="text-sm font-medium text-foreground">
+      <div className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl bg-card border border-border/40">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className={`w-3 h-3 rounded-full shrink-0 ${turn === 'w' ? 'bg-white ring-2 ring-white/30' : 'bg-slate-800 ring-2 ring-slate-600/50'}`} />
+          <span className="text-sm font-medium text-foreground truncate">
             {isGameOver
               ? isCheckmate
                 ? turn === 'w' ? 'You Lost' : 'You Won!'
@@ -76,19 +76,21 @@ export default function GameHUD({
                 : isExploringParallel
                   ? 'Exploring alternate line'
                   : turn === 'w'
-                    ? isCheck ? 'You are in check!' : 'Your turn'
+                    ? 'Your turn'
                     : 'AI turn'
             }
           </span>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
           {isCheck && !isCheckmate && (
             <span className="px-1.5 py-0.5 text-xs rounded bg-red-900/40 text-red-300 border border-red-700/30 animate-pulse">
               CHECK
             </span>
           )}
+          <span className="text-xs text-muted-foreground font-mono">
+            Move {Math.ceil(moveCount / 2)}
+          </span>
         </div>
-        <span className="text-xs text-muted-foreground font-mono">
-          Move {Math.ceil(moveCount / 2)}
-        </span>
       </div>
 
       {/* Parallel explorer banner */}
