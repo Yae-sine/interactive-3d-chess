@@ -282,11 +282,13 @@ export function useChessGame() {
     stop()
     setState(prev => {
       if (prev.history.length < 2) return prev
-      const chess = new Chess(prev.fen)
-      chess.undo()
-      chess.undo()
       // Remove last 2 moves from history
       const newHistory = prev.history.slice(0, -2)
+      // Recreate position by replaying moves from scratch (FEN-loaded Chess has no undo history)
+      const chess = new Chess()
+      for (const move of newHistory) {
+        chess.move(move)
+      }
       const derived = derivedState(chess, newHistory, null)
       const lastMove = newHistory.length > 0 ? { from: newHistory[newHistory.length - 1].from as Square, to: newHistory[newHistory.length - 1].to as Square } : null
       setTimeout(() => addMsg({ type: 'info', title: 'Takeback', content: 'Move undone. Use this chance to find a stronger continuation — think about what the engine might exploit.' }), 0)
