@@ -267,10 +267,11 @@ export default function Board3D({
           filter: 'blur(30px)' }} />
 
       {/* 3D perspective container */}
-      <div style={{ perspective: '1200px', perspectiveOrigin: '50% 40%' }}>
+      <div style={{ perspective: '1200px', perspectiveOrigin: '50% 40%', pointerEvents: 'none' }}>
         <div style={{
           transform: `rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`,
           transformStyle: 'preserve-3d',
+          pointerEvents: 'none',
         }}>
           {/* Drop shadow plane */}
           <div aria-hidden="true" style={{
@@ -297,6 +298,7 @@ export default function Board3D({
               '0 4px 24px rgba(180,100,20,0.25)',
             ].join(', '),
             transformStyle: 'preserve-3d',
+            pointerEvents: 'none',
           }}>
             {/* Wood grain on frame */}
             <div className="absolute inset-0 wood-grain rounded pointer-events-none opacity-40" aria-hidden="true" />
@@ -306,6 +308,7 @@ export default function Board3D({
               padding: '3px',
               borderRadius: '3px',
               background: 'linear-gradient(135deg, rgba(255,200,80,0.28) 0%, rgba(90,45,8,0.9) 45%, rgba(255,200,80,0.14) 100%)',
+              pointerEvents: 'none',
             }}>
               {/* Board grid */}
               <div style={{
@@ -316,6 +319,7 @@ export default function Board3D({
                 height: boardSize,
                 boxShadow: 'inset 0 0 40px rgba(0,0,0,0.35)',
                 overflow: 'hidden',
+                pointerEvents: 'auto',
               }}>
                 {RANKS.map((rank, ri) =>
                   FILES.map((file, fi) => {
@@ -346,6 +350,7 @@ export default function Board3D({
             background: 'linear-gradient(to right, #280d04, #3d1a08, #280d04)',
             transform: 'translateY(100%) rotateX(-90deg)',
             transformOrigin: 'top center',
+            pointerEvents: 'none',
           }} />
         </div>
       </div>
