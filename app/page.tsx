@@ -65,6 +65,7 @@ export default function ChessPage() {
           />
 
           <CapturedPieces
+            fen={state.fen}
             capturedWhite={state.capturedWhite}
             capturedBlack={state.capturedBlack}
           />

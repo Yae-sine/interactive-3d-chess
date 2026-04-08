@@ -8,9 +8,6 @@ import {
 } from '@/lib/chess-engine'
 import { useStockfish } from './use-stockfish'
 
-let _idCounter = 0
-function genId() { return `msg_${++_idCounter}_${Date.now()}` }
-
 function derivedState(chess: Chess, prevHistory: Move[], newMove: Move | null): Partial<GameState> {
   // Append the new move to existing history (chess.history() resets when created from FEN)
   const history = newMove ? [...prevHistory, newMove] : prevHistory
@@ -41,14 +38,20 @@ function derivedState(chess: Chess, prevHistory: Move[], newMove: Move | null): 
 }
 
 export function useChessGame() {
+  const messageSeqRef = useRef(1)
+  const nextMessageMeta = useCallback(() => {
+    const seq = messageSeqRef.current++
+    return { id: `msg_${seq}`, timestamp: seq }
+  }, [])
+
   const [state, setState] = useState<GameState>(() => ({
     ...INITIAL_STATE,
     coachMessages: [{
-      id: genId(),
+      id: 'msg_0',
       type: 'info',
       title: 'Welcome to Chess Master 3D',
       content: 'Your AI coach is ready. Play your first move — I\'ll watch for blunders, offer hints, and explain every key moment. Control the center, develop early, castle soon!',
-      timestamp: Date.now(),
+      timestamp: 0,
     }],
   }))
 
@@ -65,9 +68,9 @@ export function useChessGame() {
   const addMsg = useCallback((msg: Omit<CoachMessage, 'id' | 'timestamp'>) => {
     setState(prev => ({
       ...prev,
-      coachMessages: [{ ...msg, id: genId(), timestamp: Date.now() }, ...prev.coachMessages.slice(0, 24)],
+      coachMessages: [{ ...msg, ...nextMessageMeta() }, ...prev.coachMessages.slice(0, 24)],
     }))
-  }, [])
+  }, [nextMessageMeta])
 
   // ── Stockfish callbacks ────────────────────────────────────────────────────
   const handleBestMove = useCallback((move: { from: string; to: string; promotion?: string }) => {
@@ -368,18 +371,19 @@ export function useChessGame() {
     stop()
     checkmateShownRef.current = false
     setShowCheckmateDialog(false)
+    const nextMeta = nextMessageMeta()
     setState(prev => ({
       ...INITIAL_STATE,
       difficulty: prev.difficulty,
       coachMessages: [{
-        id: genId(),
+        id: nextMeta.id,
         type: 'info',
         title: 'New Game',
         content: 'Game reset. Good luck! Remember: control the center, develop your pieces, and castle early. I\'ll coach you through every move.',
-        timestamp: Date.now(),
+        timestamp: nextMeta.timestamp,
       }],
     }))
-  }, [stop])
+  }, [nextMessageMeta, stop])
 
   // ── Close checkmate dialog ──────────────────────────────────────────────────
   const closeCheckmateDialog = useCallback(() => {

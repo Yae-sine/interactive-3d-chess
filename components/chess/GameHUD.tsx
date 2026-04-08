@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { RotateCcw, Lightbulb, GitBranch, X, RefreshCw, Crown, Shield, Zap, Brain } from 'lucide-react'
 import { Difficulty, DIFFICULTY_LABELS } from '@/lib/chess-engine'
 
@@ -56,8 +57,17 @@ export default function GameHUD({
   onStartParallel,
   onExitParallel,
 }: GameHUDProps) {
+  const [isHydrated, setIsHydrated] = useState(false)
+
+  useEffect(() => {
+    setIsHydrated(true)
+  }, [])
+
   const DiffIcon = DIFFICULTY_ICONS[difficulty]
   const diffColor = DIFFICULTY_COLORS[difficulty]
+  const isTakebackDisabled = !isHydrated || !canTakeback || isThinking || isExploringParallel
+  const isHintDisabled = !isHydrated || isThinking || turn !== 'w' || isGameOver || isExploringParallel
+  const isParallelDisabled = !isHydrated || isThinking
 
   return (
     <div className="flex flex-col gap-3">
@@ -134,7 +144,7 @@ export default function GameHUD({
       <div className="grid grid-cols-3 gap-2">
         <button
           onClick={onTakeback}
-          disabled={!canTakeback || isThinking || isExploringParallel}
+          disabled={isTakebackDisabled}
           className="flex flex-col items-center gap-1.5 px-2 py-2.5 rounded-xl border border-border/40 bg-card hover:bg-secondary/60 disabled:opacity-30 disabled:cursor-not-allowed transition-all group"
         >
           <RotateCcw className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
@@ -143,7 +153,7 @@ export default function GameHUD({
 
         <button
           onClick={onHint}
-          disabled={isThinking || turn !== 'w' || isGameOver || isExploringParallel}
+          disabled={isHintDisabled}
           className="flex flex-col items-center gap-1.5 px-2 py-2.5 rounded-xl border border-amber-500/30 bg-amber-950/10 hover:bg-amber-950/25 disabled:opacity-30 disabled:cursor-not-allowed transition-all group"
         >
           <Lightbulb className="w-4 h-4 text-amber-400" />
@@ -163,7 +173,7 @@ export default function GameHUD({
       {!isExploringParallel && !isGameOver && moveCount >= 2 && (
         <button
           onClick={onStartParallel}
-          disabled={isThinking}
+          disabled={isParallelDisabled}
           className="flex items-center gap-2 px-3 py-2 rounded-xl border border-blue-500/30 bg-blue-950/10 hover:bg-blue-950/25 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
         >
           <GitBranch className="w-4 h-4 text-blue-400" />

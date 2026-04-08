@@ -12,6 +12,7 @@ const PIECE_VALUES: Record<string, number> = {
 }
 
 interface CapturedPiecesProps {
+  fen: string
   capturedWhite: Piece[]  // white pieces captured by black
   capturedBlack: Piece[]  // black pieces captured by white
 }
@@ -36,23 +37,38 @@ function PieceRow({ pieces, label, advantage }: { pieces: Piece[]; label: string
   )
 }
 
-export default function CapturedPieces({ capturedWhite, capturedBlack }: CapturedPiecesProps) {
-  if (capturedWhite.length === 0 && capturedBlack.length === 0) return null
+export default function CapturedPieces({ fen, capturedWhite, capturedBlack }: CapturedPiecesProps) {
+  // Calculate material from board state so promotions affect score correctly
+  const advantage = getMaterialAdvantageFromFen(fen)
 
-  // Calculate material values
-  const whiteValue = capturedBlack.reduce((s, p) => s + PIECE_VALUES[p.type], 0) // what white captured
-  const blackValue = capturedWhite.reduce((s, p) => s + PIECE_VALUES[p.type], 0) // what black captured
-  const advantage = whiteValue - blackValue // positive = white ahead, negative = black ahead
+  if (capturedWhite.length === 0 && capturedBlack.length === 0 && advantage === 0) return null
 
   return (
     <div className="rounded-xl border border-border/40 bg-card px-3 py-2 space-y-1.5">
       <p className="text-xs text-muted-foreground font-medium mb-2">Captured Pieces</p>
-      {capturedBlack.length > 0 && (
+      {(capturedBlack.length > 0 || advantage > 0) && (
         <PieceRow pieces={capturedBlack} label="You" advantage={advantage > 0 ? advantage : 0} />
       )}
-      {capturedWhite.length > 0 && (
+      {(capturedWhite.length > 0 || advantage < 0) && (
         <PieceRow pieces={capturedWhite} label="AI" advantage={advantage < 0 ? -advantage : 0} />
       )}
     </div>
   )
+}
+
+function getMaterialAdvantageFromFen(fen: string): number {
+  const board = fen.split(' ')[0] ?? ''
+  let white = 0
+  let black = 0
+
+  for (const ch of board) {
+    if (ch === '/' || /\d/.test(ch)) continue
+
+    const type = ch.toLowerCase()
+    const value = PIECE_VALUES[type] ?? 0
+    if (ch === ch.toUpperCase()) white += value
+    else black += value
+  }
+
+  return white - black
 }
