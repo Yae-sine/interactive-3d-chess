@@ -153,7 +153,7 @@ export function useChessGame() {
   // ── Square click handler ──────────────────────────────────────────────────
   const handleSquareClick = useCallback((square: Square) => {
     setState(prev => {
-      if (prev.isGameOver || prev.isThinking) return prev
+      if (prev.isGameOver || prev.isThinking || prev.pendingPromotion) return prev
 
       const fen = prev.isExploringParallel && prev.parallelFen ? prev.parallelFen : prev.fen
       const chess = new Chess(fen)
@@ -162,7 +162,17 @@ export function useChessGame() {
       if (prev.isExploringParallel) {
         if (prev.selectedSquare && prev.selectedSquare !== square) {
           const legal = chess.moves({ square: prev.selectedSquare, verbose: true }) as Move[]
-          const match = legal.find(m => m.to === square)
+          const destinationMoves = legal.filter(m => m.to === square)
+          const promotionMoves = destinationMoves.filter(m => !!m.promotion)
+          if (promotionMoves.length > 0) {
+            return {
+              ...prev,
+              pendingPromotion: { from: prev.selectedSquare, to: square, isParallel: true },
+              selectedSquare: null,
+              validMoves: [],
+            }
+          }
+          const match = destinationMoves[0]
           if (match) {
             chess.move(match)
             return { ...prev, parallelFen: chess.fen(), parallelMoves: [...prev.parallelMoves, match], selectedSquare: null, validMoves: [] }
@@ -181,15 +191,22 @@ export function useChessGame() {
 
       if (prev.selectedSquare && prev.selectedSquare !== square) {
         const legal = chess.moves({ square: prev.selectedSquare, verbose: true }) as Move[]
-        const match = legal.find(m => m.to === square)
+        const destinationMoves = legal.filter(m => m.to === square)
+        const promotionMoves = destinationMoves.filter(m => !!m.promotion)
+
+        if (promotionMoves.length > 0) {
+          return {
+            ...prev,
+            pendingPromotion: { from: prev.selectedSquare, to: square, isParallel: false },
+            selectedSquare: null,
+            validMoves: [],
+          }
+        }
+
+        const match = destinationMoves[0]
 
         if (match) {
           const fenBefore = prev.fen
-
-          // Pawn promotion — show promotion UI instead of moving immediately
-          if (match.flags.includes('p')) {
-            return { ...prev, pendingPromotion: { from: prev.selectedSquare, to: square }, selectedSquare: null, validMoves: [] }
-          }
 
           // Blunder detection (quick local eval)
           const { isBlunder, bestSan } = getBlunderSeverity(fenBefore, match)
@@ -255,14 +272,27 @@ export function useChessGame() {
   const handlePromotion = useCallback((piece: 'q' | 'r' | 'b' | 'n') => {
     setState(prev => {
       if (!prev.pendingPromotion) return prev
-      const chess = new Chess(prev.fen)
-      const { from, to } = prev.pendingPromotion
+      const { from, to, isParallel } = prev.pendingPromotion
+      const sourceFen = isParallel ? (prev.parallelFen ?? prev.fen) : prev.fen
+      const chess = new Chess(sourceFen)
       const match = (chess.moves({ verbose: true }) as Move[]).find(
         m => m.from === from && m.to === to && m.promotion === piece
       )
       if (!match) return { ...prev, pendingPromotion: null }
 
       chess.move(match)
+
+      if (isParallel) {
+        return {
+          ...prev,
+          parallelFen: chess.fen(),
+          parallelMoves: [...prev.parallelMoves, match],
+          pendingPromotion: null,
+          selectedSquare: null,
+          validMoves: [],
+        }
+      }
+
       const derived = derivedState(chess, prev.history, match)
       const newState: GameState = {
         ...prev, ...derived,
@@ -296,14 +326,14 @@ export function useChessGame() {
       const derived = derivedState(chess, newHistory, null)
       const lastMove = newHistory.length > 0 ? { from: newHistory[newHistory.length - 1].from as Square, to: newHistory[newHistory.length - 1].to as Square } : null
       setTimeout(() => addMsg({ type: 'info', title: 'Takeback', content: 'Move undone. Use this chance to find a stronger continuation — think about what the engine might exploit.' }), 0)
-      return { ...prev, ...derived, lastMove, selectedSquare: null, validMoves: [], hintMove: null, isThinking: false, moveCount: Math.max(0, prev.moveCount - 2), isCheckmate: false, isDraw: false, isGameOver: false }
+      return { ...prev, ...derived, lastMove, selectedSquare: null, validMoves: [], hintMove: null, pendingPromotion: null, isThinking: false, moveCount: Math.max(0, prev.moveCount - 2), isCheckmate: false, isDraw: false, isGameOver: false }
     })
   }, [addMsg, stop])
 
   // ── Hint ──────────────────────────────────────────────────────────────────
   const requestHint = useCallback(() => {
     setState(prev => {
-      if (prev.turn !== 'w' || prev.isThinking || prev.isGameOver) return prev
+      if (prev.turn !== 'w' || prev.isThinking || prev.isGameOver || prev.pendingPromotion) return prev
       hintPendingRef.current = true
       setTimeout(() => requestHintMove(prev.fen), 0)
       return prev
@@ -312,12 +342,12 @@ export function useChessGame() {
 
   // ── Parallel exploration ───────────────────────────────────────────────────
   const startParallelExploration = useCallback((fromFen: string) => {
-    setState(prev => ({ ...prev, parallelFen: fromFen, parallelMoves: [], isExploringParallel: true, selectedSquare: null, validMoves: [] }))
+    setState(prev => ({ ...prev, parallelFen: fromFen, parallelMoves: [], isExploringParallel: true, pendingPromotion: null, selectedSquare: null, validMoves: [] }))
     addMsg({ type: 'analysis', title: 'Parallel Explorer Active', content: 'Exploring an alternate line. Move freely to see how the position could have unfolded. Click Exit Explorer when done.' })
   }, [addMsg])
 
   const exitParallelExploration = useCallback(() => {
-    setState(prev => ({ ...prev, isExploringParallel: false, parallelFen: null, parallelMoves: [], selectedSquare: null, validMoves: [] }))
+    setState(prev => ({ ...prev, isExploringParallel: false, parallelFen: null, parallelMoves: [], pendingPromotion: null, selectedSquare: null, validMoves: [] }))
   }, [])
 
   // ── Difficulty ────────────────────────────────────────────────────────────

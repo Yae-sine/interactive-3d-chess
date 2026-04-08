@@ -13,7 +13,7 @@ interface BoardProps {
   lastMove: { from: Square; to: Square } | null
   hintMove: { from: Square; to: Square } | null
   isExploringParallel: boolean
-  pendingPromotion: { from: Square; to: Square } | null
+  pendingPromotion: { from: Square; to: Square; isParallel: boolean } | null
   onSquareClick: (sq: Square) => void
   onPromotion: (piece: 'q' | 'r' | 'b' | 'n') => void
 }

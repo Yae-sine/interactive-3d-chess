@@ -35,7 +35,7 @@ export interface GameState {
   isThinking: boolean
   hintMove: { from: Square; to: Square } | null
   moveCount: number
-  pendingPromotion: { from: Square; to: Square } | null
+  pendingPromotion: { from: Square; to: Square; isParallel: boolean } | null
 }
 
 export const DIFFICULTY_DEPTH: Record<Difficulty, number> = {
