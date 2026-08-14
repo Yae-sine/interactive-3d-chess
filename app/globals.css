@@ -4,43 +4,70 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Core palette: near-black, warm amber gold, walnut wood */
-  --background:        #0d0b08;
-  --foreground:        #f0ead8;
-  --card:              #141209;
-  --card-foreground:   #f0ead8;
-  --popover:           #1a1710;
-  --popover-foreground:#f0ead8;
-  --primary:           #c9922a;
-  --primary-foreground:#0d0b08;
-  --secondary:         #1e1b14;
-  --secondary-foreground: #d4c89a;
-  --muted:             #1a1710;
-  --muted-foreground:  #7a7060;
-  --accent:            #c9922a;
-  --accent-foreground: #0d0b08;
-  --destructive:       #c0392b;
-  --destructive-foreground: #f0ead8;
-  --border:            #2a2418;
-  --input:             #2a2418;
-  --ring:              #c9922a;
-  --radius:            0.45rem;
+  /* ── The Grandmaster's Atelier ────────────────────────────────────
+     Room / structure */
+  --background:        #0c0a08;
+  --background-room:   #0a0806;
+  --foreground:        #ece3d2;
+  --card:              #14100c;
+  --card-foreground:   #ece3d2;
+  --popover:           #1a1410;
+  --popover-foreground:#ece3d2;
+  --primary:           #c9a45c;
+  --primary-foreground:#0c0a08;
+  --secondary:         #1c1610;
+  --secondary-foreground: #cfc3a9;
+  --muted:             #17120c;
+  --muted-foreground:  #7d7060;
+  --accent:            #c9a45c;
+  --accent-foreground: #0c0a08;
+  --destructive:       #c2552e;
+  --destructive-foreground: #f6ead2;
+  --border:            #2a2118;
+  --input:             #2a2118;
+  --ring:              #c9a45c;
+  --radius:            0.4rem;
 
-  /* Board colors */
-  --sq-light:  #f0d9b5;
-  --sq-dark:   #b58863;
-  --sq-select: #7fc97f;
-  --sq-move:   #cdd16e;
-  --sq-hint:   #e6a817;
-  --sq-check:  #e84040;
-  --sq-parallel-light: #a8d8ea;
-  --sq-parallel-dark:  #4a90c4;
+  /* Wood / board */
+  --sq-light:  #eccfa3;
+  --sq-dark:   #9a6a3c;
+  --sq-select: #8fa05f;
+  --sq-move:   #cfbf8a;
+  --sq-hint:   #d9ab62;
+  --sq-check:  #d8502e;
+  --sq-last:   #e2c57f;
+  --sq-parallel-light: #9fb8c8;
+  --sq-parallel-dark:  #5f7f96;
+
+  /* Materials */
+  --ivory:     #f6ead2;
+  --ivory-dim: #d9bd8f;
+  --ebony:     #20140c;
+  --ebony-dim: #120b07;
+  --brass:     #c9a45c;
+  --brass-bright: #e8c98a;
+  --brass-dim: #8a6f3f;
+  --walnut:    #4a2813;
+  --walnut-deep:#2a1408;
+  --felt:      #16261d;
+  --felt-edge: #0d1711;
+
+  /* Semantic status (muted, gallery-grade) */
+  --tone-blunder:  #c2552e;
+  --tone-hint:     #d9ab62;
+  --tone-good:     #87a08a;
+  --tone-info:     #b8ab93;
+  --tone-analysis: #6e95ad;
+  --tone-foreground: #1a1410;
 }
 
 @theme inline {
-  --font-sans: 'Inter', 'Inter Fallback', system-ui, sans-serif;
-  --font-mono: 'Geist Mono', 'Geist Mono Fallback', monospace;
+  --font-sans: var(--font-grotesk);
+  --font-serif: var(--font-fraunces);
+  --font-mono: var(--font-plex);
+
   --color-background:       var(--background);
+  --color-room:             var(--background-room);
   --color-foreground:       var(--foreground);
   --color-card:             var(--card);
   --color-card-foreground:  var(--card-foreground);
@@ -59,62 +86,195 @@
   --color-border:           var(--border);
   --color-input:            var(--input);
   --color-ring:             var(--ring);
+  --color-ivory:            var(--ivory);
+  --color-ebony:            var(--ebony);
+  --color-brass:            var(--brass);
+  --color-brass-bright:     var(--brass-bright);
+  --color-brass-dim:        var(--brass-dim);
+  --color-steel:            var(--tone-analysis);
+  --color-sage:             var(--tone-good);
+
   --radius-sm: calc(var(--radius) - 2px);
   --radius-md: var(--radius);
   --radius-lg: calc(var(--radius) + 4px);
+
+  /* Motion */
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-settle: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dur-fast: 140ms;
+  --dur-med: 260ms;
+  --dur-slow: 480ms;
 }
 
 @layer base {
   * { @apply border-border outline-ring/50; }
   body { @apply bg-background text-foreground font-sans; }
+  ::selection { background: rgba(201, 164, 92, 0.3); }
 }
 
+/* ── Atelier utilities ──────────────────────────────────────────── */
+
 /* Thin scrollbar */
-.thin-scroll::-webkit-scrollbar { width: 3px; }
-.thin-scroll::-webkit-scrollbar-track { background: transparent; }
-.thin-scroll::-webkit-scrollbar-thumb {
-  background: #2a2418;
+.atelier-scroll::-webkit-scrollbar { width: 4px; height: 4px; }
+.atelier-scroll::-webkit-scrollbar-track { background: transparent; }
+.atelier-scroll::-webkit-scrollbar-thumb {
+  background: #3a2e1f;
   border-radius: 2px;
 }
 
-/* Wood grain texture overlay */
+/* Micro label */
+.label-caps {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #7d7060;
+}
+
+/* Walnut wood grain (procedural) */
 .wood-grain {
   background-image:
     repeating-linear-gradient(
-      92deg,
+      88deg,
       transparent 0px,
-      rgba(0,0,0,0.018) 1px,
+      rgba(20, 8, 2, 0.16) 1px,
       transparent 2px,
-      transparent 6px
+      transparent 7px
     ),
     repeating-linear-gradient(
-      180deg,
+      178deg,
       transparent 0px,
-      rgba(255,200,80,0.03) 1px,
+      rgba(255, 214, 140, 0.045) 1px,
       transparent 3px,
-      transparent 12px
+      transparent 14px
     );
 }
 
-/* Board square base glow on selection */
-@keyframes select-pulse {
-  0%,100% { box-shadow: inset 0 0 0 3px rgba(127,201,127,0.6); }
-  50%      { box-shadow: inset 0 0 0 3px rgba(127,201,127,1.0); }
+/* Felt texture */
+.felt-texture {
+  background-image:
+    radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1.4px),
+    radial-gradient(rgba(0, 0, 0, 0.28) 1px, transparent 1.4px);
+  background-size: 5px 5px, 5px 5px;
+  background-position: 0 0, 2px 2px;
 }
-.sq-selected { animation: select-pulse 1.4s ease-in-out infinite; }
 
-/* Check king flash */
+/* Room vignette */
+.room-vignette {
+  background:
+    radial-gradient(ellipse 72% 58% at 50% 34%, rgba(201, 164, 92, 0.10) 0%, transparent 60%),
+    radial-gradient(ellipse 120% 100% at 50% 50%, transparent 55%, rgba(0, 0, 0, 0.55) 100%);
+}
+
+/* Brass plaque / control */
+.brass-border {
+  border: 1px solid rgba(201, 164, 92, 0.28);
+  background:
+    linear-gradient(180deg, rgba(201, 164, 92, 0.08) 0%, rgba(201, 164, 92, 0.03) 100%),
+    #14100c;
+}
+
+/* ── Keyframes ──────────────────────────────────────────────────── */
+
+/* Skip layout/paint of off-screen panels until they enter the viewport */
+.atelier-skip {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 380px;
+}
+
+/* Checked king flash */
 @keyframes check-flash {
-  0%,100% { background-color: #e84040cc; }
-  50%     { background-color: #e84040; }
+  0%, 100% { background-color: rgba(216, 80, 46, 0.82); }
+  50%      { background-color: rgba(216, 80, 46, 1); }
 }
 .sq-check { animation: check-flash 0.7s ease-in-out infinite; }
 
-/* AI thinking dots */
-@keyframes bounce-dot {
-  0%,80%,100% { transform: translateY(0); }
-  40%         { transform: translateY(-5px); }
+/* Hint ring pulse */
+@keyframes hint-pulse {
+  0%, 100% { box-shadow: inset 0 0 0 3px rgba(217, 171, 98, 0.55); }
+  50%      { box-shadow: inset 0 0 0 5px rgba(217, 171, 98, 0.9); }
 }
-.dot-1 { animation: bounce-dot 1.2s ease-in-out infinite 0.0s; }
-.dot-2 { animation: bounce-dot 1.2s ease-in-out infinite 0.2s; }
-.dot-3 { animation: bounce-dot 1.2s ease-in-out infinite 0.4s; }
+.sq-hint { animation: hint-pulse 1.1s ease-in-out infinite; }
+
+/* Selection pulse */
+@keyframes select-pulse {
+  0%, 100% { box-shadow: inset 0 0 0 3px rgba(143, 160, 95, 0.55); }
+  50%      { box-shadow: inset 0 0 0 3px rgba(143, 160, 95, 1); }
+}
+.sq-selected { animation: select-pulse 1.4s ease-in-out infinite; }
+
+/* Piece landing */
+@keyframes piece-land {
+  0%   { transform: scale(1.14); }
+  55%  { transform: scale(0.94); }
+  80%  { transform: scale(1.04); }
+  100% { transform: scale(1); }
+}
+.piece-land { animation: piece-land 300ms var(--ease-settle); }
+
+/* Capture burst ring */
+@keyframes capture-burst {
+  0%   { opacity: 0.9; transform: scale(0.3); }
+  100% { opacity: 0;   transform: scale(1.6); }
+}
+.capture-burst { animation: capture-burst 420ms ease-out forwards; }
+
+/* Thinking shimmer */
+@keyframes thinking-pulse {
+  0%, 100% { opacity: 0.35; }
+  50%      { opacity: 1; }
+}
+.thinking-dot { animation: thinking-pulse 1.15s ease-in-out infinite; }
+
+/* Soft fade */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.fade-in { animation: fade-in var(--dur-med) var(--ease-out-soft); }
+
+/* Rise-in (transform-only) */
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.rise-in { animation: rise-in var(--dur-med) var(--ease-out-soft); }
+
+/* New message in */
+@keyframes msg-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.985); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.msg-in { animation: msg-in var(--dur-slow) var(--ease-out-soft); }
+
+/* New scoresheet move */
+@keyframes move-in {
+  from { opacity: 0; transform: translateX(-6px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.move-in { animation: move-in var(--dur-med) var(--ease-out-soft); }
+
+/* Caret for streaming voice */
+@keyframes caret-blink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.25; }
+}
+.voice-caret { animation: caret-blink 1s ease-in-out infinite; }
+
+/* Turn indicator halo */
+@keyframes halo-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(201, 164, 92, 0.35); }
+  50%      { box-shadow: 0 0 0 4px rgba(201, 164, 92, 0.12); }
+}
+.turn-halo { animation: halo-pulse 2s ease-in-out infinite; }
+
+/* Reduced motion: kill everything decorative */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

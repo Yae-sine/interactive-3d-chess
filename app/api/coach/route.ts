@@ -5,7 +5,7 @@ export const maxDuration = 30
 export async function POST(req: Request) {
   const { fen, move, betterMove, type, history } = await req.json()
 
-  let systemPrompt = `You are a world-class chess coach named Magnus. You teach in a clear, encouraging, and educational style. 
+  const systemPrompt = `You are a world-class chess coach named Magnus. You teach in a clear, encouraging, and educational style. 
 Keep responses concise (2-4 sentences max). Focus on chess principles: piece activity, king safety, pawn structure, material, and tactics.`
 
   let userPrompt = ''

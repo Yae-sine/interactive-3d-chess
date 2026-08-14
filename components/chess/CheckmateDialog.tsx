@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport } from 'ai'
-import { Crown, RefreshCw, MessageSquare, X, Send, Sparkles, User } from 'lucide-react'
+import { RefreshCw, MessageSquare, X, Send, User, ChevronLeft } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { Crest } from './crest'
 
 interface CheckmateDialogProps {
   open: boolean
@@ -21,7 +22,6 @@ interface CheckmateDialogProps {
   onNewGame: () => void
 }
 
-// Helper to extract text content from a message
 function getMessageContent(message: { parts?: Array<{ type: string; text?: string }> }): string {
   if (message.parts) {
     return message.parts
@@ -43,38 +43,31 @@ export default function CheckmateDialog({
   const [inputValue, setInputValue] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
 
-  // Use refs to always get current values in the transport body function
   const moveHistoryRef = useRef(moveHistory)
   const winnerRef = useRef(winner)
   moveHistoryRef.current = moveHistory
   winnerRef.current = winner
 
-  // Compute move count once (full moves, not half-moves)
   const moveCount = Math.ceil(moveHistory.length / 2)
 
-  // Create transport - body function uses refs to always get fresh values
   const transport = useMemo(() => new DefaultChatTransport({
     body: () => ({
       moveHistory: moveHistoryRef.current,
       result: winnerRef.current === 'player' ? 'Player (White) won by checkmate' : 'AI (Black) won by checkmate',
       playerColor: 'w',
     }),
-  }), []) // Empty deps - refs provide fresh values
+  }), [])
 
-  const { messages, sendMessage, status, setMessages } = useChat({
-    transport,
-  })
+  const { messages, sendMessage, status, setMessages } = useChat({ transport })
 
   const isLoading = status === 'streaming' || status === 'submitted'
 
-  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
   }, [messages])
 
-  // Reset chat when showChat becomes true - compute message inline with current values
   useEffect(() => {
     if (showChat) {
       setInputValue('')
@@ -116,47 +109,55 @@ export default function CheckmateDialog({
       <DialogContent
         showCloseButton={false}
         className={cn(
-          "bg-[#0d0b09] border-[#1a1612] shadow-2xl",
-          showChat ? "sm:max-w-xl" : "sm:max-w-md"
+          "brass-border bg-[#100d0a]/95 shadow-[0_40px_120px_rgba(0,0,0,0.9),0_0_0_1px_rgba(240,217,166,0.08)] gap-0 rounded-2xl p-0 overflow-hidden",
+          showChat ? "sm:max-w-2xl" : "sm:max-w-md"
         )}
       >
         {!showChat ? (
           <>
-            <DialogHeader className="text-center space-y-4">
-              {/* Crown animation */}
-              <div className="mx-auto w-20 h-20 rounded-full bg-gradient-to-br from-amber-600/20 to-amber-900/20 border border-amber-500/30 flex items-center justify-center animate-pulse">
-                <Crown className={cn(
-                  "w-10 h-10",
-                  winner === 'player' ? "text-amber-400" : "text-red-400"
-                )} />
+            {/* Winner banner */}
+            <div
+              className="relative px-6 pt-7 pb-5 text-center"
+              style={{
+                background: winner === 'player'
+                  ? 'radial-gradient(ellipse 70% 100% at 50% 0%, rgba(135,160,138,0.14) 0%, transparent 70%)'
+                  : 'radial-gradient(ellipse 70% 100% at 50% 0%, rgba(194,85,46,0.14) 0%, transparent 70%)',
+              }}
+            >
+              <div className="mx-auto mb-3 w-16 h-16 rounded-full flex items-center justify-center"
+                style={{ background: 'rgba(201,164,92,0.08)', border: '1px solid rgba(201,164,92,0.35)', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }}>
+                <Crest size={42} />
               </div>
-
-              <div>
-                <DialogTitle className={cn(
-                  "text-2xl font-bold",
-                  winner === 'player' ? "text-amber-400" : "text-red-400"
-                )}>
-                  {winner === 'player' ? 'Checkmate!' : 'Checkmate'}
-                </DialogTitle>
-                <p className="text-[#8a8478] mt-2">
-                  {winner === 'player'
-                    ? 'Congratulations! You delivered checkmate.'
-                    : 'The AI has won this game.'}
-                </p>
-              </div>
-
-              {/* Move count badge */}
-              <div className="inline-flex mx-auto px-3 py-1.5 rounded-full bg-[#1a1612] border border-[#2a2420]">
-                <span className="text-xs text-[#6a6258]">
-                  Game completed in <span className="text-[#c9c2b4] font-medium">{moveCount}</span> moves
+              <DialogTitle
+                className={cn(
+                  "font-serif text-2xl",
+                  winner === 'player' ? "text-brass-bright" : "text-[#e07a52]"
+                )}
+              >
+                Checkmate
+              </DialogTitle>
+              <p className="mt-2 text-sm text-foreground/70">
+                {winner === 'player'
+                  ? 'A game well won — clean, deliberate, and clinical.'
+                  : 'The engine prevailed this time. The position rewards study.'}
+              </p>
+              <div className="inline-flex items-center gap-2 mt-4 px-3 py-1.5 rounded-full brass-border">
+                <span className="text-[11px] font-mono text-muted-foreground">
+                  {moveCount} move{moveCount === 1 ? '' : 's'} ·{' '}
+                  <span className="text-brass">{winner === 'player' ? 'Victory' : 'Defeat'}</span>
                 </span>
               </div>
-            </DialogHeader>
+            </div>
 
-            <div className="flex flex-col gap-3 mt-6">
+            <div className="flex flex-col gap-2.5 px-6 pb-6 pt-2">
               <Button
                 onClick={handleNewGame}
-                className="w-full h-12 bg-gradient-to-r from-amber-700 to-amber-800 hover:from-amber-600 hover:to-amber-700 text-amber-100 border-0"
+                className="w-full h-11 text-sm font-medium"
+                style={{
+                  background: 'linear-gradient(180deg, #e0bb74, #b98f45)',
+                  color: '#1a1208',
+                  boxShadow: '0 10px 24px rgba(201,164,92,0.28), inset 0 1px 0 rgba(255,244,214,0.5)',
+                }}
               >
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Play New Game
@@ -165,138 +166,118 @@ export default function CheckmateDialog({
               <Button
                 onClick={() => setShowChat(true)}
                 variant="outline"
-                className="w-full h-12 border-purple-500/40 bg-purple-950/20 hover:bg-purple-950/40 text-purple-300 hover:text-purple-200"
+                className="w-full h-11 text-sm font-medium brass-border bg-transparent text-brass hover:bg-brass/10"
               >
                 <MessageSquare className="w-4 h-4 mr-2" />
-                Chat with AI about the Game
+                Discuss the Game with Magnus
               </Button>
 
               <Button
                 onClick={handleClose}
                 variant="ghost"
-                className="w-full h-10 text-[#6a6258] hover:text-[#8a8478] hover:bg-[#1a1612]"
+                className="w-full h-9 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-white/[0.04]"
               >
-                <X className="w-4 h-4 mr-2" />
+                <X className="w-3.5 h-3.5 mr-2" />
                 Close
               </Button>
             </div>
           </>
         ) : (
           <>
-            <DialogHeader className="flex flex-row items-center justify-between border-b border-[#1a1612] pb-4">
-              <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-gradient-to-br from-purple-600 to-purple-800 shadow-lg">
-                  <Sparkles className="w-4 h-4 text-purple-200" />
-                </div>
-                <div>
-                  <DialogTitle className="text-[#e8e2d4] text-base">Magnus</DialogTitle>
-                  <p className="text-xs text-[#6a6258]">AI Coach - Game Analysis</p>
-                </div>
-              </div>
+            <DialogHeader className="flex flex-row items-center gap-3 px-5 py-3.5 border-b border-border/70">
               <Button
                 onClick={() => setShowChat(false)}
                 variant="ghost"
                 size="icon-sm"
-                className="text-[#6a6258] hover:text-[#8a8478] hover:bg-[#1a1612]"
+                aria-label="Back"
+                className="text-muted-foreground hover:text-foreground hover:bg-white/[0.04]"
               >
-                <X className="w-4 h-4" />
+                <ChevronLeft className="w-4 h-4" />
               </Button>
+              <Crest size={30} />
+              <div className="leading-tight">
+                <DialogTitle className="text-[15px] font-serif italic text-foreground">Magnus</DialogTitle>
+                <p className="label-caps !text-[9px] mt-0.5">Post-game analysis</p>
+              </div>
             </DialogHeader>
 
-            {/* Chat messages */}
+            {/* Messages */}
             <div
               ref={scrollRef}
-              className="flex-1 min-h-[300px] max-h-[400px] overflow-y-auto space-y-3 py-4 coach-scroll"
+              className="flex-1 min-h-[320px] max-h-[420px] overflow-y-auto space-y-3.5 px-5 py-4 atelier-scroll"
             >
               {messages.map((message) => (
                 <div
                   key={message.id}
                   className={cn(
-                    "flex gap-3",
+                    "flex gap-2.5 msg-in",
                     message.role === 'user' ? "justify-end" : "justify-start"
                   )}
                 >
                   {message.role === 'assistant' && (
-                    <div className="flex-shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-purple-600 to-purple-800 flex items-center justify-center">
-                      <Sparkles className="w-3.5 h-3.5 text-purple-200" />
+                    <div className="flex-shrink-0 w-7 h-7 mt-0.5 opacity-90">
+                      <Crest size={28} />
                     </div>
                   )}
                   <div
                     className={cn(
-                      "max-w-[80%] rounded-lg px-3 py-2 text-sm",
+                      "max-w-[82%] rounded-xl px-3.5 py-2.5 text-[13px] leading-relaxed",
                       message.role === 'user'
-                        ? "bg-amber-900/30 border border-amber-700/30 text-[#e8e2d4]"
-                        : "bg-[#1a1612] border border-[#2a2420] text-[#c9c2b4]"
+                        ? "bg-[#1a1208] border border-brass/25 text-foreground/90"
+                        : "bg-white/[0.04] border border-border/80 text-foreground/80 font-serif"
                     )}
                   >
                     {getMessageContent(message)}
                   </div>
                   {message.role === 'user' && (
-                    <div className="flex-shrink-0 w-7 h-7 rounded-full bg-amber-900/40 border border-amber-700/30 flex items-center justify-center">
-                      <User className="w-3.5 h-3.5 text-amber-400" />
+                    <div className="flex-shrink-0 w-7 h-7 mt-0.5 rounded-full bg-white/[0.05] border border-border flex items-center justify-center">
+                      <User className="w-3.5 h-3.5 text-muted-foreground" />
                     </div>
                   )}
                 </div>
               ))}
               {isLoading && (
-                <div className="flex gap-3">
-                  <div className="flex-shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-purple-600 to-purple-800 flex items-center justify-center">
-                    <Sparkles className="w-3.5 h-3.5 text-purple-200" />
+                <div className="flex gap-2.5">
+                  <div className="flex-shrink-0 w-7 h-7 opacity-90">
+                    <Crest size={28} />
                   </div>
-                  <div className="bg-[#1a1612] border border-[#2a2420] rounded-lg px-3 py-2">
-                    <div className="flex gap-1">
-                      {[0, 1, 2].map((i) => (
-                        <div
-                          key={i}
-                          className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce"
-                          style={{ animationDelay: `${i * 0.15}s` }}
-                        />
-                      ))}
-                    </div>
+                  <div className="bg-white/[0.04] border border-border/80 rounded-xl px-3.5 py-2.5 flex items-center gap-1.5">
+                    {[0, 1, 2].map(i => (
+                      <span
+                        key={i}
+                        className="w-1.5 h-1.5 rounded-full bg-brass thinking-dot"
+                        style={{ animationDelay: `${i * 0.15}s` }}
+                      />
+                    ))}
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Chat input */}
-            <form onSubmit={handleChatSubmit} className="flex gap-2 pt-3 border-t border-[#1a1612]">
+            {/* Input */}
+            <form onSubmit={handleChatSubmit} className="flex gap-2 px-5 py-3.5 border-t border-border/70">
               <input
                 type="text"
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                placeholder="Ask about the game..."
-                className="flex-1 h-10 px-3 rounded-lg bg-[#111010] border border-[#1a1612] text-[#e8e2d4] text-sm placeholder:text-[#5a554d] focus:outline-none focus:border-purple-500/50 transition-colors"
+                placeholder="Ask Magnus about the game…"
+                aria-label="Ask Magnus about the game"
+                className="flex-1 h-10 px-3.5 rounded-xl bg-[#0e0b09] border border-border text-foreground text-sm placeholder:text-muted-foreground/70 focus:outline-none focus:border-brass/50 transition-colors"
               />
               <Button
                 type="submit"
                 disabled={isLoading || !inputValue.trim()}
-                size="icon"
-                className="h-10 w-10 bg-purple-700 hover:bg-purple-600 disabled:opacity-50"
+                aria-label="Send message"
+                className="h-10 w-10 shrink-0"
+                style={{
+                  background: 'linear-gradient(180deg, #e0bb74, #b98f45)',
+                  color: '#1a1208',
+                  boxShadow: 'inset 0 1px 0 rgba(255,244,214,0.5)',
+                }}
               >
                 <Send className="w-4 h-4" />
               </Button>
             </form>
-
-            {/* Quick actions */}
-            <div className="flex gap-2 pt-3">
-              <Button
-                onClick={handleNewGame}
-                variant="outline"
-                size="sm"
-                className="flex-1 border-amber-500/30 bg-amber-950/10 hover:bg-amber-950/25 text-amber-400 text-xs"
-              >
-                <RefreshCw className="w-3 h-3 mr-1.5" />
-                New Game
-              </Button>
-              <Button
-                onClick={handleClose}
-                variant="ghost"
-                size="sm"
-                className="flex-1 text-[#6a6258] hover:text-[#8a8478] hover:bg-[#1a1612] text-xs"
-              >
-                Close
-              </Button>
-            </div>
           </>
         )}
       </DialogContent>

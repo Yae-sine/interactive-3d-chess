@@ -12,15 +12,6 @@ export async function POST(req: Request) {
   const result: string = body.result ?? 'Unknown result'
   const playerColor: string = body.playerColor ?? 'w'
 
-  // Debug: log what we received
-  console.log('API received:', {
-    messageCount: messages?.length,
-    moveHistoryLength: moveHistory.length,
-    result,
-    playerColor,
-    fullBody: JSON.stringify(body, null, 2)
-  })
-
   const systemPrompt = `You are Magnus, a world-class chess coach and former world champion. You've just finished watching a chess game and are ready to discuss it with the player.
 
 GAME DETAILS:

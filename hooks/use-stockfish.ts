@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useCallback } from 'react'
+import { useRef, useCallback } from 'react'
 import { DIFFICULTY_DEPTH, type Difficulty } from '@/lib/chess-engine'
 
 interface StockfishMove {
@@ -17,19 +17,24 @@ interface UseStockfishOptions {
 
 /**
  * Manages a Stockfish.js worker instance.
- * Stockfish runs as a Web Worker using the `stockfish` npm package.
+ *
+ * The worker is spawned LAZILY on the first engine request (first player move
+ * or hint) rather than on mount: stockfish.js is ~1.5 MB and must never
+ * compete with first paint. Commands issued before the worker reports
+ * 'readyok' are queued and flushed automatically.
  */
 export function useStockfish({ onBestMove, onReady }: UseStockfishOptions) {
   const workerRef = useRef<Worker | null>(null)
   const readyRef = useRef(false)
-  const pendingRef = useRef<string | null>(null)
+  const pendingRef = useRef<string[]>([])
   const onBestMoveRef = useRef(onBestMove)
   const onReadyRef = useRef(onReady)
   onBestMoveRef.current = onBestMove
   onReadyRef.current = onReady
 
-  useEffect(() => {
-    // Load Stockfish from local public folder (browsers block cross-origin workers)
+  const spawn = useCallback(() => {
+    if (workerRef.current) return
+
     const worker = new Worker('/stockfish.js')
 
     worker.onmessage = (e: MessageEvent<string>) => {
@@ -43,12 +48,10 @@ export function useStockfish({ onBestMove, onReady }: UseStockfishOptions) {
       if (line === 'readyok') {
         readyRef.current = true
         onReadyRef.current()
-        // Run any pending commands
-        if (pendingRef.current) {
-          const cmds = pendingRef.current.split('\n')
-          cmds.forEach(cmd => worker.postMessage(cmd))
-          pendingRef.current = null
-        }
+        // Flush any commands issued before the engine was ready
+        const cmds = pendingRef.current
+        pendingRef.current = []
+        cmds.forEach(cmd => cmd.split('\n').forEach(c => worker.postMessage(c)))
         return
       }
       if (line.startsWith('bestmove')) {
@@ -68,31 +71,34 @@ export function useStockfish({ onBestMove, onReady }: UseStockfishOptions) {
 
     workerRef.current = worker
     worker.postMessage('uci')
-
-    return () => {
-      worker.terminate()
-      workerRef.current = null
-    }
   }, [])
 
   const requestMove = useCallback((fen: string, difficulty: Difficulty) => {
     const depth = DIFFICULTY_DEPTH[difficulty]
 
+    if (!workerRef.current) spawn()
+
     if (!readyRef.current || !workerRef.current) {
       // Store pending command - stockfish.js 10 uses depth-only for difficulty
-      pendingRef.current = `position fen ${fen}\ngo depth ${depth}`
+      pendingRef.current.push(`position fen ${fen}\ngo depth ${depth}`)
       return
     }
 
     workerRef.current.postMessage(`position fen ${fen}`)
     workerRef.current.postMessage(`go depth ${depth}`)
-  }, [])
+  }, [spawn])
 
   const requestHintMove = useCallback((fen: string) => {
-    if (!readyRef.current || !workerRef.current) return
+    if (!workerRef.current) spawn()
+
+    if (!readyRef.current || !workerRef.current) {
+      pendingRef.current.push(`position fen ${fen}\ngo depth 10`)
+      return
+    }
+
     workerRef.current.postMessage(`position fen ${fen}`)
     workerRef.current.postMessage('go depth 10')
-  }, [])
+  }, [spawn])
 
   const stop = useCallback(() => {
     workerRef.current?.postMessage('stop')

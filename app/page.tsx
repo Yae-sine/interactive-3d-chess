@@ -1,11 +1,22 @@
 'use client'
 
+import { useMemo } from 'react'
 import { useChessGame } from '@/hooks/use-chess-game'
+import GameHeader from '@/components/chess/GameHeader'
 import GameHUD from '@/components/chess/GameHUD'
 import CoachPanel from '@/components/chess/CoachPanel'
 import CapturedPieces from '@/components/chess/CapturedPieces'
+import MoveScoresheet from '@/components/chess/MoveScoresheet'
 import Board3D from '@/components/chess/Board3D'
 import CheckmateDialog from '@/components/chess/CheckmateDialog'
+
+/** SSR-safe entrance: CSS animation (no JS-flash), staggered by inline delay */
+function riseIn(style?: React.CSSProperties) {
+  return {
+    className: 'rise-in',
+    style,
+  }
+}
 
 export default function ChessPage() {
   const {
@@ -22,109 +33,100 @@ export default function ChessPage() {
     newGame,
   } = useChessGame()
 
-  // Determine winner: if it's white's turn and checkmate, AI (black) won; otherwise player (white) won
+  const sanHistory = useMemo(() => state.history.map(m => m.san), [state.history])
+
+  // Deterministic winner derivation: if it's white's turn at checkmate, engine (black) won
   const checkmateWinner = state.turn === 'w' ? 'ai' : 'player'
 
   return (
-    <main className="flex h-screen overflow-hidden bg-[#0a0908]">
-      {/* Left Panel - Controls */}
-      <aside className="w-64 flex flex-col border-r border-[#1a1612] bg-[#0d0b09]">
-        {/* Header */}
-        <header className="px-4 py-4 border-b border-[#1a1612]">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-700 to-amber-900 flex items-center justify-center shadow-lg">
-              <span className="text-xl text-amber-200">♛</span>
-            </div>
-            <div>
-              <h1 className="text-base font-semibold text-[#e8e2d4]">Chess Master</h1>
-              <p className="text-xs text-[#6a6258]">Stockfish AI</p>
-            </div>
-          </div>
-        </header>
-
-        {/* Game Controls */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          <GameHUD
-            difficulty={state.difficulty}
-            turn={state.turn}
-            isThinking={state.isThinking}
-            isGameOver={state.isGameOver}
-            isCheck={state.isCheck}
-            isCheckmate={state.isCheckmate}
-            isDraw={state.isDraw}
-            isExploringParallel={state.isExploringParallel}
-            parallelMoveCount={state.parallelMoves.length}
-            moveCount={state.moveCount}
-            canTakeback={state.history.length >= 2}
-            onTakeback={takeback}
-            onHint={requestHint}
-            onNewGame={newGame}
-            onDifficultyChange={setDifficulty}
-            onStartParallel={() => startParallelExploration(state.fen)}
-            onExitParallel={exitParallelExploration}
-          />
-
-          <CapturedPieces
-            fen={state.fen}
-            capturedWhite={state.capturedWhite}
-            capturedBlack={state.capturedBlack}
-          />
-
-          {/* Board Legend */}
-          <div className="rounded-lg p-3 bg-[#111010] border border-[#1a1612]">
-            <p className="text-[10px] uppercase tracking-wider text-[#5a554d] mb-2 font-medium">Legend</p>
-            <div className="space-y-1.5 text-xs">
-              {[
-                { color: '#7fc97f', label: 'Selected' },
-                { color: '#f0f069', label: 'Last move' },
-                { color: '#e6a817', label: 'Hint' },
-                { color: '#e84040', label: 'Check' },
-                { color: '#4a90c4', label: 'Exploring' },
-              ].map(({ color, label }) => (
-                <div key={label} className="flex items-center gap-2">
-                  <div className="w-2.5 h-2.5 rounded-sm" style={{ background: color }} />
-                  <span className="text-[#6a6258]">{label}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </aside>
-
-      {/* Center - Chess Board */}
-      <div className="flex-1 relative isolate" style={{ overflow: 'visible' }}>
-        <Board3D
-          fen={state.fen}
-          parallelFen={state.parallelFen}
-          selectedSquare={state.selectedSquare}
-          validMoves={state.validMoves}
-          lastMove={state.lastMove}
-          hintMove={state.hintMove}
+    <div className="flex flex-col h-dvh overflow-hidden bg-background">
+      <div {...riseIn({ animationDelay: '0.02s' })}>
+        <GameHeader
+          difficulty={state.difficulty}
+          turn={state.turn}
+          isThinking={state.isThinking}
+          isGameOver={state.isGameOver}
+          isCheck={state.isCheck}
+          isCheckmate={state.isCheckmate}
+          isDraw={state.isDraw}
           isExploringParallel={state.isExploringParallel}
-          pendingPromotion={state.pendingPromotion}
-          onSquareClick={handleSquareClick}
-          onPromotion={handlePromotion}
+          moveCount={state.moveCount}
+          onDifficultyChange={setDifficulty}
         />
       </div>
 
-      {/* Right Panel - Coach */}
-      <aside className="w-80 border-l border-[#1a1612] bg-[#0d0b09]">
-        <CoachPanel
-          messages={state.coachMessages}
-          isThinking={state.isThinking}
-          isExploringParallel={state.isExploringParallel}
-          moveHistory={state.history.map(m => m.san)}
-        />
-      </aside>
+      {/* Single DOM: stacked on mobile (page scrolls), side-by-side on desktop */}
+      <main className="flex-1 min-h-0 flex flex-col overflow-y-auto atelier-scroll lg:overflow-hidden lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(320px,400px)]">
+        {/* Board stage */}
+        <div
+          {...riseIn({ animationDelay: '0.1s' })}
+          className="relative flex flex-col shrink-0 min-h-0 h-[calc(100svh-56px)] lg:h-auto lg:flex-1"
+        >
+          <div className="relative flex-1 min-h-0 flex items-center justify-center">
+            <Board3D
+              fen={state.fen}
+              parallelFen={state.parallelFen}
+              selectedSquare={state.selectedSquare}
+              validMoves={state.validMoves}
+              lastMove={state.lastMove}
+              hintMove={state.hintMove}
+              isExploringParallel={state.isExploringParallel}
+              pendingPromotion={state.pendingPromotion}
+              onSquareClick={handleSquareClick}
+              onPromotion={handlePromotion}
+            />
+          </div>
 
-      {/* Checkmate Dialog */}
+          {/* Control dock */}
+          <div className="relative z-10 shrink-0 flex justify-center px-3 pb-3">
+            <GameHUD
+              turn={state.turn}
+              isThinking={state.isThinking}
+              isGameOver={state.isGameOver}
+              isCheckmate={state.isCheckmate}
+              isDraw={state.isDraw}
+              isExploringParallel={state.isExploringParallel}
+              parallelMoveCount={state.parallelMoves.length}
+              canTakeback={state.history.length >= 2}
+              onTakeback={takeback}
+              onHint={requestHint}
+              onNewGame={newGame}
+              onStartParallel={() => startParallelExploration(state.fen)}
+              onExitParallel={exitParallelExploration}
+            />
+          </div>
+        </div>
+
+        {/* Magnus column — flex-order swaps layout per breakpoint, single DOM */}
+        <aside
+          {...riseIn({ animationDelay: '0.16s' })}
+          className="flex flex-col min-h-0 shrink-0 atelier-skip lg:border-l lg:border-border/70 lg:bg-card/45"
+        >
+          <div className="order-1 lg:order-2 shrink-0 border-b border-border/70 lg:border-0">
+            <CapturedPieces
+              fen={state.fen}
+              capturedWhite={state.capturedWhite}
+              capturedBlack={state.capturedBlack}
+            />
+          </div>
+          <div className="order-2 lg:order-1 h-[380px] shrink-0 border-b border-border/70 lg:h-auto lg:flex-1 lg:min-h-0 lg:border-0">
+            <CoachPanel
+              messages={state.coachMessages}
+              isThinking={state.isThinking}
+              isExploringParallel={state.isExploringParallel}
+            />
+          </div>
+          <MoveScoresheet moves={sanHistory} />
+        </aside>
+      </main>
+
       <CheckmateDialog
         open={showCheckmateDialog}
         onOpenChange={closeCheckmateDialog}
         winner={checkmateWinner}
-        moveHistory={state.history.map(m => m.san)}
+        moveHistory={sanHistory}
         onNewGame={newGame}
       />
-    </main>
+    </div>
   )
 }
